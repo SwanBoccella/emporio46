@@ -9,7 +9,7 @@
     --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
     --ease-inout: cubic-bezier(0.76, 0, 0.24, 1);
     --ease-circ: cubic-bezier(0.85, 0, 0.15, 1);
-    --nav-h: 70px;
+    --nav-h: 78px;
     --gold: #c4561f;
     --gold-light: #dd7a4a;
     --gold-dim: rgba(196,86,31,0.12);

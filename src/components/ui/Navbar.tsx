@@ -72,6 +72,7 @@ export default function Navbar({ onOpenLegal, bannerActive }: { onOpenLegal?: (t
           borderRadius: 999,
           paddingLeft: 'clamp(1rem, 3vw, 2.2rem)',
           paddingRight: 'clamp(1rem, 3vw, 2.2rem)',
+          textShadow: '0 0 10px rgba(var(--text-halo-rgb, 0,0,0), 0.45)',
         }}
         animate={{
           background: scrolled ? 'color-mix(in srgb, var(--color-bg-card) 94%, transparent)' : 'transparent',
@@ -84,17 +85,19 @@ export default function Navbar({ onOpenLegal, bannerActive }: { onOpenLegal?: (t
         {/* Sfondo della barra: compare insieme al "pill" quando si scorre */}
         <div aria-hidden="true" style={{ position: 'absolute', inset: 0, borderRadius: 'inherit', overflow: 'hidden', pointerEvents: 'none', zIndex: -1 }}>
           <SectionBackdrop slot="navbar" visible={scrolled} />
+          {/* Velo del colore della card: la texture resta come venatura, ma il testo ha sempre contrasto (tema chiaro e scuro) */}
+          <div style={{ position: 'absolute', inset: 0, background: 'color-mix(in srgb, var(--color-bg-card) 86%, transparent)', opacity: scrolled ? 1 : 0, transition: 'opacity 0.45s' }} />
         </div>
         {/* Logo */}
         <button
           onClick={() => scrollTo('hero')}
-          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0, minWidth: 0 }}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 1, minWidth: 0 }}
         >
           {settings.logoUrl ? (
           <img
             src={settings.logoUrl}
             alt={`${settings.siteName || 'Emporio 46'} logo`}
-            style={{ height: 44, width: 44, objectFit: 'contain', borderRadius: '50%', filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))', flexShrink: 0 }}
+            style={{ height: 52, width: 52, objectFit: 'contain', borderRadius: '50%', filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))', flexShrink: 0 }}
             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
           />
           ) : (
@@ -103,7 +106,7 @@ export default function Navbar({ onOpenLegal, bannerActive }: { onOpenLegal?: (t
               <text x="18" y="23" textAnchor="middle" fontFamily="var(--font-display)" fontStyle="italic" fontSize="15" fill="var(--color-primary)">46</text>
             </svg>
           )}
-          <span className="nav-brand-text" style={{ fontFamily: 'var(--font-label)', fontSize: 'clamp(0.6rem, 2vw, 0.82rem)', letterSpacing: '0.08em', color: 'var(--color-text, #f5ede0)', lineHeight: 1.2, whiteSpace: 'nowrap', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 'clamp(100px, 28vw, 220px)' }}>
+          <span className="nav-brand-text" style={{ fontFamily: 'var(--font-label)', fontSize: 'clamp(1.1rem, 5vw, 1.45rem)', fontWeight: 500, letterSpacing: '0.05em', color: 'var(--color-text, #f5ede0)', lineHeight: 1.15, whiteSpace: 'nowrap', flexShrink: 1, minWidth: 0 }}>
             {(settings.siteName || 'Emporio 46').split(' ').map((word, i, arr) => (
               <span key={i}>
                 <span style={{ color: 'var(--color-primary-text, var(--color-primary))' }}>{word.charAt(0)}</span>{word.slice(1)}{i < arr.length - 1 ? ' ' : ''}
@@ -118,14 +121,14 @@ export default function Navbar({ onOpenLegal, bannerActive }: { onOpenLegal?: (t
             <button
               key={link.id}
               onClick={() => scrollTo(link.id)}
-              style={{ borderRadius: 999, fontFamily: 'var(--font-label)', fontSize: '0.7rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--color-text-muted, #9a8a78)', transition: 'color 0.3s', background: 'none', border: 'none', cursor: 'pointer', padding: '0.3rem 0', position: 'relative' }}
+              style={{ borderRadius: 999, fontFamily: 'var(--font-label)', fontSize: 'clamp(0.74rem, 1.05vw, 0.86rem)', fontWeight: 500, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--color-text-soft, var(--color-text))', transition: 'color 0.3s', background: 'none', border: 'none', cursor: 'pointer', padding: '0.3rem 0', position: 'relative' }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.color = 'var(--color-text, #f5ede0)'
                 const line = e.currentTarget.querySelector('.nav-line') as HTMLElement
                 if (line) line.style.width = '100%'
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.color = 'var(--color-text-muted, #9a8a78)'
+                e.currentTarget.style.color = 'var(--color-text-soft, var(--color-text))'
                 const line = e.currentTarget.querySelector('.nav-line') as HTMLElement
                 if (line) line.style.width = '0'
               }}
@@ -133,7 +136,7 @@ export default function Navbar({ onOpenLegal, bannerActive }: { onOpenLegal?: (t
               {link.label}
               <span
                 className="nav-line"
-                style={{ position: 'absolute', bottom: -2, left: 0, height: 1, width: 0, background: 'var(--color-primary)', transition: 'width 0.4s cubic-bezier(0.16,1,0.3,1)' }}
+                style={{ position: 'absolute', bottom: -2, left: 0, height: 2, width: 0, background: 'var(--color-primary)', transition: 'width 0.4s cubic-bezier(0.16,1,0.3,1)' }}
               />
             </button>
           ))}
@@ -141,9 +144,9 @@ export default function Navbar({ onOpenLegal, bannerActive }: { onOpenLegal?: (t
           {/* Legal link */}
           <button
             onClick={() => onOpenLegal?.('termini')}
-            style={{ borderRadius: 999, fontFamily: 'var(--font-label)', fontSize: '0.7rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--color-text-muted, #9a8a78)', transition: 'color 0.3s', background: 'none', border: 'none', cursor: 'pointer', padding: '0.3rem 0', position: 'relative' }}
+            style={{ borderRadius: 999, fontFamily: 'var(--font-label)', fontSize: 'clamp(0.74rem, 1.05vw, 0.86rem)', fontWeight: 500, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--color-text-soft, var(--color-text))', transition: 'color 0.3s', background: 'none', border: 'none', cursor: 'pointer', padding: '0.3rem 0', position: 'relative' }}
             onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text, #f5ede0)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted, #9a8a78)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-soft, var(--color-text))' }}
           >
             {lang === 'it' ? 'Note Legali' : 'Legal'}
           </button>
@@ -151,9 +154,9 @@ export default function Navbar({ onOpenLegal, bannerActive }: { onOpenLegal?: (t
           {/* Lang toggle */}
           <button
             onClick={handleLangToggle}
-            style={{ borderRadius: 999, fontFamily: 'var(--font-label)', fontSize: '0.66rem', letterSpacing: '0.22em', color: 'var(--color-primary-text, var(--color-primary))', border: '1px solid rgba(var(--color-primary-rgb), 0.28)', padding: '0.28rem 0.65rem', background: 'transparent', cursor: 'pointer', transition: 'all 0.3s', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+            style={{ borderRadius: 999, fontFamily: 'var(--font-label)', fontSize: '0.82rem', fontWeight: 600, letterSpacing: '0.16em', color: 'var(--color-primary-text, var(--color-primary))', border: '1.5px solid var(--color-primary-text, var(--color-primary))', padding: '0.35rem 0.8rem', background: 'transparent', cursor: 'pointer', transition: 'all 0.3s', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
             onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-primary, #c9a84c)'; e.currentTarget.style.color = 'var(--color-bg, #0a0805)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-primary)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-primary-text, var(--color-primary))' }}
           >
             {isTranslatingEn && lang === 'en' && <span style={{ display: 'inline-block', animation: 'spin 1s linear infinite', fontSize: '0.7rem' }}>◌</span>}
             {lang === 'it' ? 'EN' : 'IT'}
@@ -161,9 +164,9 @@ export default function Navbar({ onOpenLegal, bannerActive }: { onOpenLegal?: (t
 
           <button
             onClick={goToBook}
-            style={{ borderRadius: 999, fontFamily: 'var(--font-label)', fontSize: '0.7rem', letterSpacing: '0.18em', textTransform: 'uppercase', padding: '0.55rem 1.5rem', border: '1px solid rgba(var(--color-primary-rgb), 0.5)', color: 'var(--color-primary-text, var(--color-primary))', background: 'transparent', cursor: 'pointer', transition: 'all 0.35s' }}
+            style={{ borderRadius: 999, fontFamily: 'var(--font-label)', fontSize: 'clamp(0.74rem, 1.05vw, 0.86rem)', fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', padding: '0.6rem 1.4rem', border: '1.5px solid var(--color-primary-text, var(--color-primary))', color: 'var(--color-primary-text, var(--color-primary))', background: 'transparent', cursor: 'pointer', transition: 'all 0.35s' }}
             onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-primary, #c9a84c)'; e.currentTarget.style.color = 'var(--color-bg, #0a0805)'; e.currentTarget.style.borderColor = 'var(--color-primary)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-primary)'; e.currentTarget.style.borderColor = 'rgba(var(--color-primary-rgb), 0.5)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-primary-text, var(--color-primary))'; e.currentTarget.style.borderColor = 'var(--color-primary-text, var(--color-primary))' }}
           >
             {t.nav.book}
           </button>
@@ -180,8 +183,8 @@ export default function Navbar({ onOpenLegal, bannerActive }: { onOpenLegal?: (t
             cursor: 'pointer',
             display: 'flex',
             flexDirection: 'column',
-            gap: 6,
-            padding: '12px',
+            gap: 7,
+            padding: '14px 12px',
             marginRight: '-12px',
             zIndex: 1001,
           }}
@@ -189,12 +192,12 @@ export default function Navbar({ onOpenLegal, bannerActive }: { onOpenLegal?: (t
           {[0, 1, 2].map((i) => (
             <motion.span
               key={i}
-              style={{ display: 'block', height: 1.5, width: 28, background: menuOpen ? 'var(--color-primary)' : 'var(--color-text, #f5ede0)', borderRadius: 2 }}
+              style={{ display: 'block', height: 3, width: 32, background: menuOpen ? 'var(--color-primary-text, var(--color-primary))' : 'var(--color-text, #f5ede0)', borderRadius: 3 }}
               animate={
                 menuOpen
-                  ? i === 0 ? { rotate: 45, y: 7.5 }
+                  ? i === 0 ? { rotate: 45, y: 10 }
                   : i === 1 ? { opacity: 0, scaleX: 0 }
-                  : { rotate: -45, y: -7.5 }
+                  : { rotate: -45, y: -10 }
                   : { rotate: 0, y: 0, opacity: 1, scaleX: 1 }
               }
               transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
@@ -241,9 +244,9 @@ export default function Navbar({ onOpenLegal, bannerActive }: { onOpenLegal?: (t
             {/* Decorative site name */}
             <div style={{
               fontFamily: 'var(--font-label)',
-              fontSize: 'clamp(0.45rem, 1.8vw, 0.55rem)',
-              letterSpacing: '0.5em',
-              color: 'var(--color-text-muted)',
+              fontSize: 'clamp(0.8rem, 3vw, 0.95rem)',
+              letterSpacing: '0.35em',
+              color: 'var(--color-text-soft, var(--color-text))',
               textTransform: 'uppercase',
               whiteSpace: 'nowrap',
               marginBottom: 'clamp(2rem, 6vh, 3.5rem)',
@@ -272,7 +275,7 @@ export default function Navbar({ onOpenLegal, bannerActive }: { onOpenLegal?: (t
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.035 + 0.05, duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--color-primary)')}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--color-primary-text, var(--color-primary))')}
                   onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--color-text, #f5ede0)')}
                 >
                   {link.label}
@@ -309,11 +312,12 @@ export default function Navbar({ onOpenLegal, bannerActive }: { onOpenLegal?: (t
                 onClick={() => { handleLangToggle(); setMenuOpen(false) }}
                 style={{ borderRadius: 999,
                   fontFamily: 'var(--font-label)',
-                  fontSize: 'clamp(0.6rem, 2.5vw, 0.72rem)',
-                  letterSpacing: '0.3em',
+                  fontSize: 'clamp(0.85rem, 3.4vw, 1rem)',
+                  fontWeight: 600,
+                  letterSpacing: '0.2em',
                   color: 'var(--color-primary-text, var(--color-primary))',
-                  border: '1px solid rgba(var(--color-primary-rgb), 0.35)',
-                  padding: '0.6rem 2rem',
+                  border: '1.5px solid var(--color-primary-text, var(--color-primary))',
+                  padding: '0.7rem 2.2rem',
                   background: 'none',
                   cursor: 'pointer',
                   touchAction: 'manipulation',
@@ -331,10 +335,10 @@ export default function Navbar({ onOpenLegal, bannerActive }: { onOpenLegal?: (t
                 onClick={() => { onOpenLegal?.('termini'); setMenuOpen(false) }}
                 style={{ borderRadius: 999,
                   fontFamily: 'var(--font-label)',
-                  fontSize: 'clamp(0.52rem, 2vw, 0.62rem)',
-                  letterSpacing: '0.28em',
+                  fontSize: 'clamp(0.8rem, 3vw, 0.92rem)',
+                  letterSpacing: '0.18em',
                   textTransform: 'uppercase',
-                  color: 'color-mix(in srgb, var(--color-text-muted) 55%, transparent)',
+                  color: 'var(--color-text-soft, var(--color-text))',
                   background: 'none',
                   border: 'none',
                   cursor: 'pointer',
