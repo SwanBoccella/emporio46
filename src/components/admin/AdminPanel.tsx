@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useApp } from '../../context/AppContext'
 import type { SiteSettings, SeoData } from '../../context/AppContext'
 import { groqText, groqVision, groqVisionJson, extractJson, testGroq, getGroqKey, setGroqKey, isValidGroqKey, getModelOverride, setModelOverride, DEFAULT_TEXT_MODELS, DEFAULT_VISION_MODELS, type GroqTestResult } from '../../utils/groq'
-import { adminLogin, clearAdminToken, getAdminToken, changeAdminPassword } from '../../utils/adminApi'
+import { adminLogin, clearAdminToken, getAdminToken, changeAdminPassword, adminUploadAsset } from '../../utils/adminApi'
 import { THEME_PRESETS, SECTION_BG_LABELS, SECTION_BG_GROUPS, SECTION_BG_HAS_TEXT, SECTION_BG_DEFAULTS, getSectionBg, buildMapsEmbed, SYNC_STATUS } from '../../context/AppContext'
 import { bgLayerStyle, bgScrimStyle, bgScrimClass } from '../ui/SectionBackdrop'
 import type { CatalogItem, Recensione } from '../../types'
@@ -726,12 +726,12 @@ function EmailJsTools({ local }: { local: SiteSettings }) {
           <strong style={{ color: '#eb5757' }}>⚠ Sincronizzazione non attiva.</strong> Queste impostazioni vengono salvate solo in <em>questo browser</em>:
           i tuoi clienti non le vedranno e i form continueranno ad aprire WhatsApp. Su Netlify (Site configuration → Environment variables) imposta le variabili
           <code style={{ color: '#f5ede0' }}> VITE_EMAILJS_SERVICE</code>, <code style={{ color: '#f5ede0' }}>VITE_EMAILJS_PUBLIC_KEY</code>, <code style={{ color: '#f5ede0' }}>VITE_EMAILJS_TEMPLATE</code> (e opzionale <code style={{ color: '#f5ede0' }}>VITE_EMAILJS_TEMPLATE_CLIENT</code>) e rifai il deploy,
-          oppure attiva il Gist (<code style={{ color: '#f5ede0' }}>VITE_GIST_ID</code> + login admin via Netlify Function: vedi README).
+          oppure fai il login admin dal sito pubblicato su Netlify (le Function Netlify non girano con npm run dev).
         </div>
       )}
       {canWrite && (
         <div style={{ ...box, background: 'rgba(111,207,151,0.05)', borderColor: 'rgba(111,207,151,0.2)' }}>
-          <strong style={{ color: '#6fcf97' }}>✓ Sincronizzazione attiva.</strong> Le modifiche vengono pubblicate sul Gist entro ~2 secondi e raggiungono tutti i visitatori al prossimo caricamento della pagina.
+          <strong style={{ color: '#6fcf97' }}>✓ Sincronizzazione attiva.</strong> Le modifiche vengono pubblicate sul server (Netlify Database + Blobs) entro ~2 secondi e raggiungono tutti i visitatori al prossimo caricamento della pagina.
         </div>
       )}
       {!canWrite && SYNC_STATUS.canRead && !fromEnv && (
@@ -3688,13 +3688,22 @@ ${JSON.stringify({ label: itLabel, chapters: source })}`, 1200)
     // prova di lettura PRIMA di sostituire il modello attuale: se il file non è valido resta quello in uso
     const check = await validateGlb(f)
     if (!check.ok) { setMsg({ ok: false, text: check.error + ' Il modello attuale non è stato modificato.' }); setBusy(false); return }
-    try {
-      await saveLocalModel(f)
-      setUrlDraft('')
-      updateSettings({ armchairLocalName: f.name, armchairModelUrl: '', armchairRev: rev + 1 } as Partial<SiteSettings>)
-      setMsg({ ok: true, text: `Modello "${f.name}" caricato (${(f.size / 1048576).toFixed(1)} MB). Letto correttamente (${check.meshes} parti). Viene centrato, scalato e appoggiato a terra in automatico: la sezione 3D si aggiorna subito.` })
-    } catch {
-      setMsg({ ok: false, text: 'Impossibile salvare il file nel browser (memoria piena o navigazione privata).' })
+    // Pubblica il file sul server (Netlify Blobs): da quel momento lo vedono TUTTI i visitatori
+    setMsg({ ok: true, text: 'Caricamento sul server in corso… non chiudere la pagina.' })
+    const up = await adminUploadAsset(f, 'model/gltf-binary', f.name, (d, t) => setMsg({ ok: true, text: `Caricamento sul server… ${d}/${t}` }))
+    if (up.ok) {
+      await clearLocalModel(); setUrlDraft('')
+      updateSettings({ armchairModelAsset: { id: up.id, parts: up.parts, name: f.name }, armchairLocalName: '', armchairModelUrl: '', armchairRev: rev + 1 } as Partial<SiteSettings>)
+      setMsg({ ok: true, text: `Modello "${f.name}" pubblicato (${(f.size / 1048576).toFixed(1)} MB, ${check.meshes} parti): ora lo vedono tutti i visitatori. Viene centrato e appoggiato a terra in automatico.` })
+    } else {
+      // Senza server (sviluppo locale / sessione scaduta) resta solo su questo dispositivo, e te lo dico chiaramente
+      try {
+        await saveLocalModel(f); setUrlDraft('')
+        updateSettings({ armchairModelAsset: null, armchairLocalName: f.name, armchairModelUrl: '', armchairRev: rev + 1 } as Partial<SiteSettings>)
+        setMsg({ ok: false, text: `⚠ ${up.message} Il modello è visibile SOLO su questo dispositivo: rifai il login e ricaricalo per pubblicarlo.` })
+      } catch {
+        setMsg({ ok: false, text: `${up.message} E non è stato possibile tenerlo nemmeno nel browser (memoria piena o navigazione privata).` })
+      }
     }
     setBusy(false)
   }
@@ -3702,16 +3711,17 @@ ${JSON.stringify({ label: itLabel, chapters: source })}`, 1200)
     const v = urlDraft.trim()
     if (v === (settings.armchairModelUrl || '')) return
     await clearLocalModel()
-    updateSettings({ armchairModelUrl: v, armchairLocalName: '', armchairRev: rev + 1 } as Partial<SiteSettings>)
+    updateSettings({ armchairModelUrl: v, armchairModelAsset: null, armchairLocalName: '', armchairRev: rev + 1 } as Partial<SiteSettings>)
     setMsg({ ok: true, text: v ? 'URL del modello aggiornato.' : 'Tornato al modello di default.' })
   }
   const resetModel = async () => {
     await clearLocalModel(); setUrlDraft('')
-    updateSettings({ armchairLocalName: '', armchairModelUrl: '', armchairRev: rev + 1 } as Partial<SiteSettings>)
+    updateSettings({ armchairModelAsset: null, armchairLocalName: '', armchairModelUrl: '', armchairRev: rev + 1 } as Partial<SiteSettings>)
     setMsg({ ok: true, text: 'Ripristinato il modello di default.' })
   }
 
-  const usingLocal = !!settings.armchairLocalName
+  const usingAsset = !!settings.armchairModelAsset
+  const usingLocal = !usingAsset && !!settings.armchairLocalName
   const usingUrl = !!settings.armchairModelUrl
   return (
     <div>
@@ -3723,12 +3733,12 @@ ${JSON.stringify({ label: itLabel, chapters: source })}`, 1200)
       <div style={{ ...cardStyle, marginBottom: '2rem' }}>
         <p style={{ ...labelStyle, color: '#c9a84c', marginBottom: '1rem' }}>MODELLO 3D (.GLB)</p>
         <p style={{ fontFamily: 'Cormorant Garamond, serif', color: '#e8dcc8', fontSize: '0.95rem', marginBottom: '1rem' }}>
-          In uso: <b>{usingLocal ? `file caricato · ${settings.armchairLocalName}` : usingUrl ? 'file da URL' : 'modello di default'}</b>
+          In uso: <b>{usingAsset ? `file pubblicato · ${settings.armchairModelAsset!.name}` : usingLocal ? `file SOLO su questo dispositivo · ${settings.armchairLocalName}` : usingUrl ? 'file da URL' : 'modello di default'}</b>
         </p>
         <input ref={fileRef} type="file" accept=".glb,model/gltf-binary" onChange={onFile} style={{ display: 'none' }} />
         <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap', marginBottom: '1.4rem' }}>
           <button onClick={() => fileRef.current?.click()} disabled={busy} style={{ ...btnGold, opacity: busy ? 0.5 : 1 }}>{busy ? 'Caricamento…' : '⬆ Sostituisci file 3D'}</button>
-          {(usingLocal || usingUrl) && <button onClick={resetModel} style={btnGhost}>↺ Modello di default</button>}
+          {(usingAsset || usingLocal || usingUrl) && <button onClick={resetModel} style={btnGhost}>↺ Modello di default</button>}
         </div>
 
         <label style={labelStyle}>Oppure URL pubblico di un .glb</label>
@@ -3739,8 +3749,7 @@ ${JSON.stringify({ label: itLabel, chapters: source })}`, 1200)
         {msg && <p style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '0.88rem', color: msg.ok ? '#6fcf97' : '#eb5757', marginBottom: '0.8rem' }}>{msg.text}</p>}
         <p style={{ fontFamily: 'Cormorant Garamond, serif', color: '#9a8a78', fontSize: '0.84rem', lineHeight: 1.55 }}>
           Il modello viene centrato, scalato e appoggiato a terra in automatico. Usa un <code>.glb</code> unico (texture incluse, niente Draco), meglio sotto i 10 MB. Funziona con qualsiasi oggetto: sedia, scultura, lampada…<br />
-          ⚠ Il file caricato qui resta nel <b>browser dell'admin</b> (come le immagini) e non va sul Gist. Per mostrarlo a <b>tutti i visitatori</b> usa l'URL
-          (l'URL viene sincronizzato) oppure sostituisci <code>public/models/armchair.glb</code> nel progetto (il nome del file resta questo, qualunque sia l'oggetto).
+          Il file caricato qui viene pubblicato sul server e lo vedono <b>tutti i visitatori</b>. In alternativa puoi usare un URL pubblico, oppure sostituire <code>public/models/armchair.glb</code> nel progetto.
         </p>
       </div>
 

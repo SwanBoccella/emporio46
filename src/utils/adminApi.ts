@@ -1,4 +1,4 @@
-// ─── Autenticazione admin + salvataggio Gist tramite Netlify Function ────────
+// ─── Autenticazione admin + salvataggio (Netlify Database + Blobs, copia Gist) tramite Netlify Function ────────
 // Il token GitHub e la password admin vivono SOLO sul server (variabili Netlify):
 // nel browser resta soltanto un token di sessione firmato che scade dopo 12 ore.
 const ENDPOINT = '/.netlify/functions/admin-api'
@@ -44,7 +44,7 @@ export async function adminLogin(password: string): Promise<LoginResult> {
 }
 
 export type SaveResult =
-  | { ok: true; rev: string }
+  | { ok: true; rev: string; stores?: string[]; warnings?: { store: string; error: string }[] }
   | { ok: false; kind: 'auth' | 'conflict' | 'error'; message: string }
 
 export async function adminSave(data: object, baseRev: string | null): Promise<SaveResult> {
@@ -58,7 +58,7 @@ export async function adminSave(data: object, baseRev: string | null): Promise<S
     })
     let j: any = null
     try { j = await res.json() } catch { /* noop */ }
-    if (res.ok && j?.rev) return { ok: true, rev: j.rev }
+    if (res.ok && j?.rev) return { ok: true, rev: j.rev, stores: j.stores, warnings: j.warnings }
     if (res.status === 401) { clearAdminToken(); return { ok: false, kind: 'auth', message: 'Sessione scaduta: rifai il login.' } }
     if (res.status === 409) return { ok: false, kind: 'conflict', message: 'Dati modificati da un altro dispositivo: ricarica la pagina prima di salvare.' }
     return { ok: false, kind: 'error', message: j?.message || `Salvataggio non riuscito (${res.status}).` }
@@ -88,4 +88,70 @@ export async function changeAdminPassword(current: string, next: string): Promis
   } catch {
     return { ok: false, message: 'Server non raggiungibile.' }
   }
+}
+
+// ─── Upload file (immagini / modello 3D) su Netlify Blobs, a pezzi ───────────
+const CHUNK = 3 * 1024 * 1024   // 3 MB grezzi → ~4 MB in base64, sotto il limite di 6 MB delle Function
+
+const newAssetId = () => {
+  const a = new Uint8Array(16); crypto.getRandomValues(a)
+  return Array.from(a, b => b.toString(16).padStart(2, '0')).join('')
+}
+const blobToBase64 = (b: Blob) => new Promise<string>((res, rej) => {
+  const r = new FileReader()
+  r.onload = () => res(String(r.result).split(',')[1] || '')
+  r.onerror = () => rej(r.error)
+  r.readAsDataURL(b)
+})
+
+export type AssetResult = { ok: true; id: string; parts: number } | { ok: false; message: string }
+
+export async function adminUploadAsset(file: Blob, mime: string, name: string, onProgress?: (done: number, total: number) => void): Promise<AssetResult> {
+  const token = getAdminToken()
+  if (!token) return { ok: false, message: 'Sessione scaduta o modalità sviluppo: file non pubblicabile.' }
+  const id = newAssetId()
+  const total = Math.max(1, Math.ceil(file.size / CHUNK))
+  for (let i = 0; i < total; i++) {
+    const data = await blobToBase64(file.slice(i * CHUNK, (i + 1) * CHUNK))
+    let ok = false, lastMsg = 'Upload non riuscito.'
+    for (let attempt = 0; attempt < 3 && !ok; attempt++) {      // 3 tentativi per pezzo (rete mobile)
+      try {
+        const res = await fetch(ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ action: 'asset_put', id, index: i, total, mime, name, data }),
+        })
+        let j: any = null
+        try { j = await res.json() } catch { /* noop */ }
+        if (res.ok && j?.ok) ok = true
+        else {
+          lastMsg = j?.message || `Upload non riuscito (${res.status}).`
+          if (res.status === 401) { clearAdminToken(); return { ok: false, message: 'Sessione scaduta: rifai il login.' } }
+          if (res.status === 400 || res.status === 413) return { ok: false, message: lastMsg }   // inutile riprovare
+        }
+      } catch { lastMsg = 'Server non raggiungibile.' }
+    }
+    if (!ok) return { ok: false, message: lastMsg }
+    onProgress?.(i + 1, total)
+  }
+  return { ok: true, id, parts: total }
+}
+
+// Immagine (data URL) → file pubblico /media/<id>. Restituisce null se l'upload non riesce.
+const dataUrlCache = new Map<string, Promise<string | null>>()
+export function publishDataUrl(dataUrl: string): Promise<string | null> {
+  const hit = dataUrlCache.get(dataUrl)
+  if (hit) return hit
+  const p = (async () => {
+    try {
+      const m = /^data:(image\/(?:jpeg|png|webp|gif));base64,/.exec(dataUrl)
+      if (!m) return null
+      const blob = await (await fetch(dataUrl)).blob()
+      const r = await adminUploadAsset(blob, m[1], 'img')
+      return r.ok ? `/media/${r.id}` : null
+    } catch { return null }
+  })()
+  dataUrlCache.set(dataUrl, p)
+  p.then(v => { if (!v) dataUrlCache.delete(dataUrl) })      // un fallimento si può riprovare
+  return p
 }

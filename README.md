@@ -2,9 +2,11 @@
 
 **Sito web per negozio di arredi vintage e bijoux — React + TypeScript + Vite**
 
-Sito vetrina per **Emporio 46**, negozio di arredi vintage e bijoux in Via Giampaolo Orsini 46/A, Firenze. SPA completamente admin-driven: tutti i contenuti, i colori, i font e le funzionalità si configurano dal pannello di amministrazione integrato, senza toccare il codice. Zero database, zero server — tutto persiste in `localStorage`.
+Sito vetrina per **Emporio 46**, negozio di arredi vintage e bijoux in Via Giampaolo Orsini 46/A, Firenze. SPA completamente admin-driven: tutti i contenuti, i colori, i font e le funzionalità si configurano dal pannello di amministrazione integrato, senza toccare il codice. Testi, impostazioni e catalogo si salvano sul Gist; immagini e modello 3D caricati dall'admin si salvano su Netlify Blobs (`/media/<id>`): tutto è visibile a ogni visitatore. `localStorage` fa solo da cache.
 
 ---
+
+> **v57_9 – archivio contenuti.** Il pannello admin salva su **Netlify Database** (tabella `site_data`) e **Netlify Blobs**; il **Gist** resta come copia di sicurezza e come fonte da cui i dati esistenti vengono migrati al primo salvataggio. I visitatori leggono da `/.netlify/functions/site-data`; se il server non risponde, il sito ricade sul Gist.
 
 ## Indice
 

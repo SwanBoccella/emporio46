@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { groqText } from '../utils/groq'
-import { getAdminToken, clearAdminToken, adminSave } from '../utils/adminApi'
+import { getAdminToken, clearAdminToken, adminSave, publishDataUrl } from '../utils/adminApi'
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import type { CatalogItem, Recensione } from '../types'
 import { translations } from '../i18n/translations'
@@ -294,6 +294,7 @@ export interface SiteSettings {
   accreditations: { name: string; logoUrl: string; link: string }[]
   // Poltrona 3D (gestita da admin → tab "Poltrona 3D")
   armchairModelUrl: string                 // URL di un .glb ospitato (visibile a tutti i visitatori); vuoto = default
+  armchairModelAsset: { id: string; parts: number; name: string } | null   // .glb caricato dall'admin e pubblicato sul server (visibile a tutti)
   armchairLocalName: string                // nome del .glb caricato nel browser dell'admin (IndexedDB); vuoto = nessuno
   armchairRev: number                      // cambia a ogni sostituzione: invalida la cache del modello
   armchairLabels: { it?: string; en?: string }
@@ -391,6 +392,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
     { name: "Confcommercio – Imprese per l'Italia", logoUrl: '/accrediti/confcommercio.svg', link: 'https://www.confcommercio.it' },
   ],
   armchairModelUrl: '',
+  armchairModelAsset: null,
   armchairLocalName: '',
   armchairRev: 0,
   armchairLabels: {},
@@ -530,7 +532,7 @@ function load<T>(key: string, fallback: T): T {
 // Legge le variabili d'ambiente Vite (impostate su Netlify come env vars)
 const GIST_ID = import.meta.env.VITE_GIST_ID as string | undefined
 const GIST_FILE = 'mnt_data.json'
-export const SYNC_STATUS = { canRead: !!GIST_ID }
+export const SYNC_STATUS = { canRead: true }   // i contenuti arrivano dal server (Netlify Database/Blobs); il Gist è solo fallback
 
 // Chiavi che NON devono mai finire nel Gist (leggibile pubblicamente)
 const PRIVATE_KEYS = ['adminPassword'] as const
@@ -545,17 +547,18 @@ function omitPrivate<T extends Record<string, any>>(o: T): T {
 function mergeRemoteSettings(prev: SiteSettings, remote: Partial<SiteSettings>): SiteSettings {
   const r: any = omitPrivate(remote as any)
   const merged: any = { ...prev, ...r }
+  const isPub = (v: any) => typeof v === 'string' && (v.startsWith('http') || v.startsWith('/media/'))
   const imgKeys = ['logoUrl', 'faviconUrl', 'heroImageUrl', 'aboutImageUrl', 'footerImageUrl', 'reviewsBgImageUrl', 'maintenanceLogoUrl', 'maintenanceBgImageUrl']
   imgKeys.forEach(k => {
     const local = (prev as any)[k]
-    if (typeof local === 'string' && local.startsWith('data:') && !(typeof r[k] === 'string' && r[k].startsWith('http'))) merged[k] = local
+    if (typeof local === 'string' && local.startsWith('data:') && !isPub(r[k])) merged[k] = local
   })
   // Accreditamenti: il Gist riceve i loghi base64 svuotati; qui si tengono quelli locali dell'admin (slot per slot)
   if (Array.isArray(prev.accreditations)) {
     const ra: any[] = Array.isArray(r.accreditations) ? r.accreditations : []
     merged.accreditations = Array.from({ length: 4 }, (_, i) => {
       const l: any = prev.accreditations[i] || {}, rm: any = ra[i] || {}
-      const keepLocal = typeof l.logoUrl === 'string' && l.logoUrl.startsWith('data:') && !(typeof rm.logoUrl === 'string' && rm.logoUrl.startsWith('http'))
+      const keepLocal = typeof l.logoUrl === 'string' && l.logoUrl.startsWith('data:') && !isPub(rm.logoUrl)
       return { name: rm.name ?? l.name ?? '', link: rm.link ?? l.link ?? '', logoUrl: keepLocal ? l.logoUrl : (rm.logoUrl ?? l.logoUrl ?? '') }
     })
   }
@@ -563,7 +566,7 @@ function mergeRemoteSettings(prev: SiteSettings, remote: Partial<SiteSettings>):
     const sb: any = { ...r.sectionBgs }
     Object.keys(prev.sectionBgs).forEach(slot => {
       const lv: any = (prev.sectionBgs as any)[slot]
-      if (lv && typeof lv.url === 'string' && lv.url.startsWith('data:')) sb[slot] = { ...sb[slot], url: lv.url }
+      if (lv && typeof lv.url === 'string' && lv.url.startsWith('data:') && !isPub(sb[slot]?.url)) sb[slot] = { ...sb[slot], url: lv.url }
     })
     merged.sectionBgs = sb
   }
@@ -573,6 +576,32 @@ function mergeRemoteSettings(prev: SiteSettings, remote: Partial<SiteSettings>):
 // Fetch del Gist (lettura pubblica, nessun token richiesto).
 // cache:'no-cache' = rivalida sempre con ETag: le risposte 304 non consumano il limite di richieste GitHub.
 type RemoteData = { settings?: Partial<SiteSettings>; catalog?: CatalogItem[]; reviews?: Recensione[]; seo?: Partial<SeoData>; settingsEn?: Record<string, unknown>; rev?: string }
+function parseRemote(content: string): RemoteData | null {
+  try {
+    const parsed = JSON.parse(content)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
+    // Validazione minima della forma: scarta sezioni con tipo sbagliato invece di rompere il sito
+    const out: RemoteData = {}
+    if (parsed.settings && typeof parsed.settings === 'object' && !Array.isArray(parsed.settings)) out.settings = parsed.settings
+    if (Array.isArray(parsed.catalog)) out.catalog = parsed.catalog
+    if (Array.isArray(parsed.reviews)) out.reviews = parsed.reviews
+    if (parsed.seo && typeof parsed.seo === 'object' && !Array.isArray(parsed.seo)) out.seo = parsed.seo
+    if (parsed.settingsEn && typeof parsed.settingsEn === 'object') out.settingsEn = parsed.settingsEn
+    if (typeof parsed.rev === 'string') out.rev = parsed.rev
+    return out
+  } catch { return null }
+}
+
+// 1) Server: Netlify Database → Netlify Blobs (→ Gist lato server se ancora vuoti)
+async function fetchServerData(): Promise<RemoteData | null> {
+  try {
+    const res = await fetch('/.netlify/functions/site-data', { cache: 'no-cache' })
+    if (!res.ok || !(res.headers.get('content-type') || '').includes('json')) return null
+    return parseRemote(await res.text())
+  } catch { return null }
+}
+
+// 2) Fallback diretto sul Gist (lettura pubblica) se il server non risponde (es. sviluppo locale)
 async function fetchGist(): Promise<RemoteData | null> {
   if (!GIST_ID) return null
   try {
@@ -587,21 +616,23 @@ async function fetchGist(): Promise<RemoteData | null> {
     if (file?.truncated && typeof file?.raw_url === 'string' && file.raw_url.startsWith('https://gist.githubusercontent.com/')) {
       content = await (await fetch(file.raw_url, { cache: 'no-cache' })).text()
     }
-    if (!content) return null
-    const parsed = JSON.parse(content)
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
-    // Validazione minima della forma: scarta sezioni con tipo sbagliato invece di rompere il sito
-    const out: RemoteData = {}
-    if (parsed.settings && typeof parsed.settings === 'object' && !Array.isArray(parsed.settings)) out.settings = parsed.settings
-    if (Array.isArray(parsed.catalog)) out.catalog = parsed.catalog
-    if (Array.isArray(parsed.reviews)) out.reviews = parsed.reviews
-    if (parsed.seo && typeof parsed.seo === 'object' && !Array.isArray(parsed.seo)) out.seo = parsed.seo
-    if (parsed.settingsEn && typeof parsed.settingsEn === 'object') out.settingsEn = parsed.settingsEn
-    if (typeof parsed.rev === 'string') out.rev = parsed.rev
-    return out
-  } catch {
-    return null
-  }
+    return content ? parseRemote(content) : null
+  } catch { return null }
+}
+
+const fetchRemote = async (): Promise<RemoteData | null> => (await fetchServerData()) ?? (await fetchGist())
+
+// ─── Pubblicazione immagini locali (data URL) come file veri sul server ───────
+function collectDataImages(v: any, out: Set<string>) {
+  if (typeof v === 'string') { if (v.startsWith('data:image/') && v.length > 200) out.add(v); return }
+  if (Array.isArray(v)) { v.forEach(x => collectDataImages(x, out)); return }
+  if (v && typeof v === 'object') Object.values(v).forEach(x => collectDataImages(x, out))
+}
+function replaceDataImages<T>(v: T, map: Map<string, string>): T {
+  if (typeof v === 'string') return (map.get(v) ?? v) as any
+  if (Array.isArray(v)) return v.map(x => replaceDataImages(x, map)) as any
+  if (v && typeof v === 'object') { const o: any = {}; for (const k of Object.keys(v as any)) o[k] = replaceDataImages((v as any)[k], map); return o }
+  return v
 }
 
 // ─── Debounce helper ──────────────────────────────────────────────────────────
@@ -653,8 +684,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // ─── Caricamento iniziale dal Gist (source of truth per tutti i visitatori) ─
   // Viene eseguito una volta al mount: sovrascrive localStorage se il Gist ha dati più aggiornati.
   useEffect(() => {
-    if (!GIST_ID) return // Gist non configurato: funziona solo con localStorage (comportamento v58)
-    fetchGist().then(remote => {
+    fetchRemote().then(remote => {
       if (!remote) return
       revRef.current = remote.rev ?? null
       if (remote.settings) {
@@ -725,17 +755,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const doSync = useCallback(async () => {
     if (!dirtyRef.current) return
-    if (!GIST_ID) {
-      dirtyRef.current = false
-      setGistSyncStatus('local'); setGistSyncMessage('Salvato solo su questo dispositivo: manca VITE_GIST_ID, il Gist non è collegato.')
-      return
-    }
     if (!getAdminToken()) {
       if (import.meta.env.DEV) { dirtyRef.current = false; setGistSyncStatus('local'); setGistSyncMessage('Modalità sviluppo: salvato solo in locale (le Function Netlify non girano con npm run dev).'); return }
-      setGistSyncStatus('auth'); setGistSyncMessage('Sessione scaduta: rifai il login. Le modifiche NON sono state salvate sul Gist.')
+      setGistSyncStatus('auth'); setGistSyncMessage('Sessione scaduta: rifai il login. Le modifiche NON sono state salvate sul server.')
       return
     }
 
+    // 1) Le immagini caricate dal dispositivo (data URL) diventano file pubblici sul server (/media/<id>)
+    const pending = new Set<string>()
+    collectDataImages(settingsRef.current, pending); collectDataImages(catalogRef.current, pending)
+    if (pending.size > 0) {
+      setGistSyncStatus('saving'); setGistSyncMessage(`Pubblico ${pending.size} immagin${pending.size > 1 ? 'i' : 'e'} sul server…`)
+      const map = new Map<string, string>()
+      for (const d of pending) { const u = await publishDataUrl(d); if (u) map.set(d, u) }
+      if (map.size > 0) {
+        const ns = replaceDataImages(settingsRef.current, map), nc = replaceDataImages(catalogRef.current, map)
+        settingsRef.current = ns; catalogRef.current = nc
+        setSettings(ns); setCatalogRaw(nc)
+        try { localStorage.setItem('mnt_settings', JSON.stringify(ns)) } catch {}
+        try { localStorage.setItem('mnt_catalog', JSON.stringify(nc)) } catch {}
+      }
+    }
     const newSettings = settingsRef.current, newCatalog = catalogRef.current
     const lost = countDataImages(newSettings, newCatalog)
     const safeSettings = omitPrivate(stripDataImages(newSettings))
@@ -761,15 +801,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (dirtyRef.current) { setGistSyncStatus('pending'); return }   // altre modifiche in coda: partirà un nuovo salvataggio
       if (lost > 0) {
         setGistSyncStatus('warning')
-        setGistSyncMessage(`Salvato sul Gist, ma ${lost} immagine${lost > 1 ? 'i' : ''} caricat${lost > 1 ? 'e' : 'a'} dal dispositivo non ${lost > 1 ? 'sono state salvate' : 'è stata salvata'} (troppo pesanti per il Gist). Usa un link (URL) o un file in public/ perché i visitatori le vedano.`)
+        setGistSyncMessage(`Testi e impostazioni salvati, ma ${lost} immagine${lost > 1 ? 'i' : ''} caricat${lost > 1 ? 'e' : 'a'} dal dispositivo ${lost > 1 ? 'non sono state pubblicate' : 'non è stata pubblicata'}: non sono riuscite a salire sul server (connessione o sessione): riprova con «Salva ora» dopo aver rifatto il login.`)
       } else {
-        setGistSyncStatus('saved'); setGistSyncMessage('Modifiche salvate sul Gist: ora le vedono tutti i visitatori.')
+        setGistSyncStatus('saved'); setGistSyncMessage(`Modifiche salvate (${(r.stores || []).map(n => n === 'database' ? 'Database' : n === 'blobs' ? 'Blobs' : 'Gist').join(' + ')}): ora le vedono tutti i visitatori.`)
         setTimeout(() => setGistSyncStatus(s => (s === 'saved' ? 'idle' : s)), 4000)
       }
     } else {
       dirtyRef.current = true                // non confermato: resta da salvare (si può riprovare)
       setGistSyncStatus(r.kind === 'auth' ? 'auth' : r.kind === 'conflict' ? 'conflict' : 'error')
-      setGistSyncMessage(`${r.message} Le modifiche NON sono ancora sul Gist.`)
+      setGistSyncMessage(`${r.message} Le modifiche NON sono ancora sul server.`)
       if (r.kind === 'auth') clearAdminToken()
     }
   }, [])
@@ -795,9 +835,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [runSync])
   const dismissGistSync = useCallback(() => { setGistSyncStatus('idle'); setGistSyncMessage('') }, [])
 
-  // Avvisa se si chiude la pagina con modifiche non ancora sul Gist
+  // Avvisa se si chiude la pagina con modifiche non ancora sul server
   useEffect(() => {
-    const h = (e: BeforeUnloadEvent) => { if (dirtyRef.current && GIST_ID && getAdminToken()) { e.preventDefault(); e.returnValue = '' } }
+    const h = (e: BeforeUnloadEvent) => { if (dirtyRef.current && getAdminToken()) { e.preventDefault(); e.returnValue = '' } }
     window.addEventListener('beforeunload', h)
     return () => window.removeEventListener('beforeunload', h)
   }, [])
@@ -883,7 +923,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const parsed: SettingsEn = JSON.parse(cleaned)
       setSettingsEn(parsed)
       try { localStorage.setItem('mnt_settings_en', JSON.stringify(parsed)) } catch {}
-      // Sincronizza anche settingsEn sul Gist così tutti i visitatori vedono la lingua EN
+      // Sincronizza anche settingsEn sul server così tutti i visitatori vedono la lingua EN
       settingsEnRef.current = parsed
       scheduleSync()
     } catch (e) {

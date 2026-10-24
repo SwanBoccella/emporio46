@@ -4,10 +4,10 @@
 //   GIST_TOKEN      token GitHub classic con SOLO lo scope "gist"
 //   GIST_ID         (opzionale se hai già VITE_GIST_ID) id del Gist
 import { randomBytes } from 'node:crypto'
+import { readSite, writeSite } from '../lib/sitestore.mjs'
 import { readStored, verifyPassword, saveNewPassword, makeToken, checkToken, MIN_PASSWORD } from '../lib/auth.mjs'
 
 const FILE = 'mnt_data.json'
-const MAX_CHARS = 900_000          // il Gist tronca i file > 1 MB
 const SESSION_MS = 12 * 60 * 60 * 1000
 const ALLOWED_KEYS = ['settings', 'catalog', 'reviews', 'seo', 'settingsEn']
 
@@ -24,18 +24,15 @@ export default async (req) => {
   if (site && site !== 'same-origin' && site !== 'none') return json(403, { error: 'forbidden' })
 
   const ADMIN = process.env.ADMIN_PASSWORD
-  const TOKEN = process.env.GIST_TOKEN
-  const GID = process.env.GIST_ID || process.env.VITE_GIST_ID
-  if (!ADMIN || !TOKEN || !GID) {
-    return json(500, { error: 'not_configured', message: 'Mancano ADMIN_PASSWORD, GIST_TOKEN o GIST_ID nelle variabili Netlify.' })
-  }
 
   const raw = await req.text()
-  if (raw.length > MAX_CHARS + 100_000) return json(413, { error: 'too_large', message: 'Dati troppo grandi.' })
+  if (raw.length > 5_800_000) return json(413, { error: 'too_large', message: 'Richiesta troppo grande.' })
   let body
   try { body = JSON.parse(raw) } catch { return json(400, { error: 'bad_json' }) }
+  if (body.action !== 'asset_put' && raw.length > 3_000_000) return json(413, { error: 'too_large', message: 'Dati troppo grandi.' })
 
   const stored = await readStored()
+  if (!ADMIN && !stored) return json(500, { error: 'not_configured', message: 'Manca ADMIN_PASSWORD nelle variabili Netlify.' })
 
   // ── LOGIN ──
   if (body.action === 'login') {
@@ -62,6 +59,32 @@ export default async (req) => {
     }
   }
 
+  // ── UPLOAD FILE (immagini e modello 3D) su Netlify Blobs, a pezzi da ~3 MB ──
+  if (body.action === 'asset_put') {
+    const bearer = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '')
+    if (!checkToken(bearer, stored)) return json(401, { error: 'unauthorized' })
+    const { id, index, total, mime, name, data } = body
+    if (typeof id !== 'string' || !/^[a-f0-9]{24,48}$/.test(id)) return json(400, { error: 'bad_id' })
+    if (!Number.isInteger(index) || !Number.isInteger(total) || total < 1 || total > 40 || index < 0 || index >= total) return json(400, { error: 'bad_part' })
+    const isModel = mime === 'model/gltf-binary'
+    if (!isModel && !['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(mime)) return json(400, { error: 'bad_mime', message: 'Tipo di file non consentito.' })
+    if (!isModel && total !== 1) return json(400, { error: 'bad_part', message: 'Le immagini devono stare in un solo pezzo.' })
+    if (typeof data !== 'string' || !data.length) return json(400, { error: 'bad_data' })
+    let buf
+    try { buf = Buffer.from(data, 'base64') } catch { return json(400, { error: 'bad_data' }) }
+    if (!buf.length || buf.length > 4_200_000) return json(413, { error: 'too_large', message: 'Pezzo troppo grande.' })
+    if (index === 0 && isModel && buf.subarray(0, 4).toString('latin1') !== 'glTF') return json(400, { error: 'bad_glb', message: 'Il file non è un .glb valido.' })
+    try {
+      const { getStore } = await import('@netlify/blobs')
+      const store = getStore({ name: 'emporio46-assets', consistency: 'strong' })
+      await store.set(`${id}/${index}`, buf)
+      if (index === total - 1) {
+        await store.setJSON(`${id}/meta`, { mime, total, name: String(name || '').slice(0, 120), at: new Date().toISOString() })
+      }
+    } catch { return json(500, { error: 'store_failed', message: 'Archivio file (Netlify Blobs) non disponibile. Fai un nuovo deploy.' }) }
+    return json(200, { ok: true })
+  }
+
   // ── SALVATAGGIO ──
   if (body.action === 'save') {
     const bearer = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '')
@@ -76,49 +99,18 @@ export default async (req) => {
     if (!clean.seo || typeof clean.seo !== 'object') return json(400, { error: 'bad_seo' })
     delete clean.settings.adminPassword // mai pubblicare credenziali
 
-    const gh = (init = {}) => fetch(`https://api.github.com/gists/${encodeURIComponent(GID)}`, {
-      ...init,
-      headers: {
-        Authorization: `Bearer ${TOKEN}`,
-        Accept: 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-        'User-Agent': 'emporio46-admin',
-        'Content-Type': 'application/json',
-      },
-    })
-
     // Controllo di concorrenza: se un altro dispositivo ha salvato nel frattempo, non sovrascrivere
-    let remoteRev = null
-    try {
-      const cur = await gh()
-      if (!cur.ok) return json(502, { error: 'gist_read', message: `Lettura Gist non riuscita (${cur.status}). Controlla GIST_ID e GIST_TOKEN.` })
-      const file = (await cur.json())?.files?.[FILE]
-      let content = file?.content
-      if (file?.truncated && file?.raw_url) content = await (await fetch(file.raw_url)).text()
-      if (content) { try { remoteRev = JSON.parse(content)?.rev ?? null } catch { /* file non valido: lo sovrascriviamo */ } }
-    } catch { return json(502, { error: 'gist_read', message: 'GitHub non raggiungibile.' }) }
-
-    if (remoteRev && body.baseRev !== remoteRev) return json(409, { error: 'conflict', rev: remoteRev })
+    const cur = await readSite()
+    if (cur?.rev && body.baseRev !== cur.rev) return json(409, { error: 'conflict', rev: cur.rev })
 
     const rev = `${Date.now()}-${randomBytes(4).toString('hex')}`
     const content = JSON.stringify({ ...clean, rev, updatedAt: new Date().toISOString() })
-    if (content.length > MAX_CHARS) return json(413, { error: 'too_large', message: 'Il contenuto supera il limite del Gist (~900 KB): riduci immagini/testi.' })
+    if (content.length > 3_000_000) return json(413, { error: 'too_large', message: 'Il contenuto è troppo grande: riduci testi o dati.' })
 
-    try {
-      const res = await gh({ method: 'PATCH', body: JSON.stringify({ files: { [FILE]: { content } } }) })
-      if (!res.ok) {
-        const hint = res.status === 401 ? 'Token GitHub non valido o scaduto.' : res.status === 403 || res.status === 404 ? 'Controlla GIST_ID e che il token abbia lo scope "gist" e sia del proprietario del Gist.' : ''
-        return json(502, { error: 'gist_write', message: `Scrittura Gist non riuscita (${res.status}). ${hint}`.trim() })
-      }
-      // Verifica che il Gist contenga davvero la nuova revisione (GitHub restituisce il file scritto)
-      let written = null
-      try { written = (await res.json())?.files?.[FILE] } catch { /* noop */ }
-      if (!written) return json(502, { error: 'gist_verify', message: `Il Gist non contiene il file ${FILE}: la scrittura non è confermata.` })
-      if (!written.truncated && typeof written.content === 'string' && !written.content.includes(rev)) {
-        return json(502, { error: 'gist_verify', message: 'GitHub non ha confermato la nuova versione del Gist. Riprova.' })
-      }
-    } catch { return json(502, { error: 'gist_write', message: 'GitHub non raggiungibile.' }) }
-    return json(200, { ok: true, rev })
+    // Scrive su Netlify Database + Netlify Blobs (+ copia sul Gist se configurato)
+    const res = await writeSite(content, rev)
+    if (!res.ok) return json(502, { error: 'store_write', message: 'Salvataggio non riuscito su Netlify Database/Blobs. ' + res.failed.map(f => `${f.store}: ${f.error}`).join('; ') })
+    return json(200, { ok: true, rev, stores: res.written, warnings: res.failed })
   }
 
   return json(400, { error: 'unknown_action' })

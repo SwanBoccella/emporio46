@@ -82,11 +82,12 @@ export async function clearLocalModel(): Promise<void> {
 }
 
 /* ─────────────── Sorgente del modello ─────────────── */
-export interface ArmchairSource { url?: string; local?: boolean; rev?: number }
+export interface ArmchairSource { url?: string; local?: boolean; rev?: number; asset?: { id: string; parts: number } | null }
 export function armchairSource(settings: any): ArmchairSource {
-  return { url: settings?.armchairModelUrl || '', local: !!settings?.armchairLocalName, rev: settings?.armchairRev || 0 }
+  const a = settings?.armchairModelAsset
+  return { url: settings?.armchairModelUrl || '', local: !!settings?.armchairLocalName, rev: settings?.armchairRev || 0, asset: a?.id ? { id: a.id, parts: a.parts } : null }
 }
-export const sourceKey = (s: ArmchairSource = {}) => `${s.local ? 'local' : 'url'}|${s.url || ''}|${s.rev || 0}`
+export const sourceKey = (s: ArmchairSource = {}) => `${s.asset ? 'asset:' + s.asset.id : s.local ? 'local' : 'url'}|${s.url || ''}|${s.rev || 0}`
 
 let cache: { key: string; promise: Promise<THREE.Group>; objectUrl?: string } | null = null
 
@@ -128,7 +129,24 @@ export function loadArmchair(src: ArmchairSource = {}): Promise<THREE.Group> {
   const entry: typeof cache = { key, promise: null as any }
   entry.promise = (async () => {
     let url = src.url || ARMCHAIR_URL
-    if (src.local) {
+    if (src.asset) {
+      // Modello caricato dall'admin: scaricato a pezzi dal server (uguale per tutti i visitatori)
+      try {
+        const parts: ArrayBuffer[] = new Array(src.asset.parts)
+        let next = 0
+        const worker = async () => {
+          while (next < src.asset!.parts) {
+            const i = next++
+            const r = await fetch(`/.netlify/functions/asset?id=${src.asset!.id}&part=${i}`)
+            if (!r.ok) throw new Error('asset ' + r.status)
+            parts[i] = await r.arrayBuffer()
+          }
+        }
+        await Promise.all([worker(), worker(), worker(), worker()])
+        entry.objectUrl = URL.createObjectURL(new Blob(parts, { type: 'model/gltf-binary' }))
+        url = entry.objectUrl
+      } catch { /* se il download fallisce si usa il modello di default */ }
+    } else if (src.local) {
       const blob = await getLocalModel()
       if (blob) { entry.objectUrl = URL.createObjectURL(blob); url = entry.objectUrl }
     }

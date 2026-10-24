@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react'
 import { useApp } from '../../context/AppContext'
 
-// Notifica globale (sempre visibile, anche con il pannello admin aperto) sull'esito del salvataggio sul Gist.
+// Notifica globale (sempre visibile, anche con il pannello admin aperto) sull'esito del salvataggio.
 export default function SyncToast() {
   const { isAdmin, gistSyncStatus: st, gistSyncMessage: msg, gistSyncNow, dismissGistSync } = useApp()
   if (!isAdmin || st === 'idle') return null
@@ -13,7 +13,7 @@ export default function SyncToast() {
   const bg = ok ? 'rgba(20,40,28,0.97)' : busy ? 'rgba(36,29,14,0.97)' : warn ? 'rgba(40,32,12,0.97)' : 'rgba(46,17,17,0.97)'
   const title =
     st === 'pending' ? 'Modifiche in attesa di salvataggio…'
-    : st === 'saving' ? 'Salvataggio sul Gist in corso…'
+    : st === 'saving' ? 'Salvataggio in corso…'
     : st === 'saved' ? '✓ Salvato'
     : st === 'warning' ? '⚠ Salvato con un avviso'
     : st === 'local' ? 'ℹ Salvato solo in locale'
