@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="it"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light">
+<title>Nuova richiesta dal sito</title>
+<style>
+  body{margin:0;padding:0;background:#f3e8d4;-webkit-text-size-adjust:100%}
+  a{color:#c4561f}
+  @media only screen and (max-width:620px){
+    .wrap{width:100%!important} .px{padding-left:20px!important;padding-right:20px!important}
+    .h1{font-size:26px!important;line-height:32px!important} .stack{display:block!important;width:100%!important}
+    .lab{display:block!important;width:100%!important;padding-bottom:2px!important} .val{display:block!important;width:100%!important}
+  }
+</style></head>
+<body style="margin:0;padding:0;background:#f3e8d4;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#f3e8d4;font-size:1px;line-height:1px;">{{from_name}} · {{tipo}}{{#giorno}} · {{giorno}} {{orario}}{{/giorno}}&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f3e8d4" style="background:#f3e8d4;"><tr><td align="center" style="padding:28px 12px 40px;">
+<table role="presentation" class="wrap" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;">
+
+<!-- MARCHIO -->
+<tr><td align="center" style="padding:0 0 18px;">
+  {{#shop_logo}}<img src="{{shop_logo}}" alt="{{shop_name}}" width="72" height="72" style="display:block;margin:0 auto 10px;border:0;height:72px;width:auto;max-width:200px;">{{/shop_logo}}
+  <div style="font-family:Georgia,'Times New Roman',serif;font-size:13px;letter-spacing:6px;text-transform:uppercase;color:#2b1a12;font-weight:700;">{{shop_name}}</div>
+  <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#7b6454;padding-top:4px;">Arredi vintage &amp; bijoux · Firenze</div>
+</td></tr>
+
+<!-- CARD -->
+<tr><td style="background:#2b1a12;border-radius:18px;padding:0 6px 6px 0;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#fbf4e6" style="background:#fbf4e6;border:2px solid #2b1a12;border-radius:16px;overflow:hidden;">
+
+<!-- Banda titolo -->
+<tr><td bgcolor="#2b1a12" class="px" style="background:#2b1a12;padding:26px 36px 24px;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td bgcolor="#c4561f" style="background:#c4561f;border-radius:999px;padding:6px 14px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:#fbf4e6;">● Nuova richiesta dal sito</td></tr></table>
+  <div class="h1" style="font-family:Georgia,'Times New Roman',serif;font-size:32px;line-height:38px;color:#fbf4e6;padding-top:16px;font-weight:700;">{{from_name}}<br><span style="color:#e8b08a;font-size:20px;line-height:28px;font-weight:400;font-style:italic;">{{tipo}}</span></div>
+</td></tr>
+
+<!-- Dettagli -->
+<tr><td class="px" style="padding:28px 36px 8px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+<tr><td style="padding:11px 0;border-bottom:1px solid #e3d3b6;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+<td class="lab" width="130" valign="top" style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#7b6454;padding-top:3px;">Nome</td>
+<td class="val" valign="top" style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;line-height:22px;color:#2b1a12;"><strong>{{from_name}}</strong></td></tr></table></td></tr>
+<tr><td style="padding:11px 0;border-bottom:1px solid #e3d3b6;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+<td class="lab" width="130" valign="top" style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#7b6454;padding-top:3px;">Email</td>
+<td class="val" valign="top" style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;line-height:22px;color:#2b1a12;"><a href="mailto:{{email}}" style="color:#c4561f;text-decoration:underline;">{{email}}</a></td></tr></table></td></tr>
+{{#telefono}}<tr><td style="padding:11px 0;border-bottom:1px solid #e3d3b6;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+<td class="lab" width="130" valign="top" style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#7b6454;padding-top:3px;">Telefono</td>
+<td class="val" valign="top" style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;line-height:22px;color:#2b1a12;"><a href="tel:{{telefono}}" style="color:#2b1a12;text-decoration:none;">{{telefono}}</a></td></tr></table></td></tr>{{/telefono}}
+{{#giorno}}<tr><td style="padding:11px 0;border-bottom:1px solid #e3d3b6;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+<td class="lab" width="130" valign="top" style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#7b6454;padding-top:3px;">Giorno</td>
+<td class="val" valign="top" style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;line-height:22px;color:#2b1a12;"><strong>{{giorno}}</strong></td></tr></table></td></tr>{{/giorno}}
+{{#orario}}<tr><td style="padding:11px 0;border-bottom:1px solid #e3d3b6;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+<td class="lab" width="130" valign="top" style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#7b6454;padding-top:3px;">Orario</td>
+<td class="val" valign="top" style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;line-height:22px;color:#2b1a12;"><strong>{{orario}}</strong></td></tr></table></td></tr>{{/orario}}
+{{#categoria}}<tr><td style="padding:11px 0;border-bottom:1px solid #e3d3b6;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+<td class="lab" width="130" valign="top" style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#7b6454;padding-top:3px;">Categoria</td>
+<td class="val" valign="top" style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;line-height:22px;color:#2b1a12;">{{categoria}}</td></tr></table></td></tr>{{/categoria}}
+</table>
+</td></tr>
+
+<!-- Messaggio -->
+{{#descrizione}}<tr><td class="px" style="padding:10px 36px 0;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td bgcolor="#f6ead3" style="background:#f6ead3;border-left:5px solid #c4561f;border-radius:0 12px 12px 0;padding:16px 20px;">
+<div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#7b6454;padding-bottom:6px;">Descrizione</div>
+<div style="font-family:Georgia,'Times New Roman',serif;font-size:17px;line-height:26px;color:#2b1a12;white-space:pre-line;">{{descrizione}}</div></td></tr></table></td></tr>{{/descrizione}}
+{{#note}}<tr><td class="px" style="padding:14px 36px 0;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td bgcolor="#f6ead3" style="background:#f6ead3;border-left:5px solid #2f6f73;border-radius:0 12px 12px 0;padding:16px 20px;">
+<div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#7b6454;padding-bottom:6px;">Note del cliente</div>
+<div style="font-family:Georgia,'Times New Roman',serif;font-size:17px;line-height:26px;color:#2b1a12;white-space:pre-line;">{{note}}</div></td></tr></table></td></tr>{{/note}}
+
+<!-- Azioni -->
+<tr><td class="px" style="padding:26px 36px 30px;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="display:inline-block;margin:0 8px 10px 0;"><tr><td bgcolor="#c4561f" style="background:#c4561f;border:2px solid #2b1a12;border-radius:12px;"><a href="mailto:{{email}}?subject=Re:%20{{tipo}}%20-%20{{shop_name}}" style="display:inline-block;padding:13px 22px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#fbf4e6;text-decoration:none;">✉ Rispondi via email</a></td></tr></table>{{#telefono}}<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="display:inline-block;margin:0 8px 10px 0;"><tr><td bgcolor="#2f6f73" style="background:#2f6f73;border:2px solid #2b1a12;border-radius:12px;"><a href="tel:{{telefono}}" style="display:inline-block;padding:13px 22px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#fbf4e6;text-decoration:none;">☎ Chiama</a></td></tr></table>{{/telefono}}
+<div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:12px;line-height:18px;color:#7b6454;padding-top:2px;">Rispondendo a questa email scrivi direttamente al cliente (Reply-To impostato).</div>
+</td></tr>
+
+</table>
+</td></tr>
+
+<!-- PIE -->
+<tr><td align="center" class="px" style="padding:26px 24px 0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:12px;line-height:19px;color:#7b6454;">
+Ricevuta il {{data_invio}} · lingua del cliente: <strong>{{lingua}}</strong><br>
+Inviata dal modulo contatti di <a href="{{shop_site}}" style="color:#7b6454;">{{shop_site}}</a>
+</td></tr>
+</table>
+</td></tr></table>
+</body></html>

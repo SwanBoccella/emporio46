@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="it" data-mnt-offline>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#f3e8d4" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Nessuna connessione · Emporio 46</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23f3e8d4'/%3E%3Ctext x='16' y='22' font-family='serif' font-size='18' fill='%23c4561f' text-anchor='middle'%3EM%3C/text%3E%3C/svg%3E" />
+
+  <!--
+    Stesso URL font di src/index.css: il service worker lo mette in cache
+    durante la navigazione normale, così anche offline si vedono i font del sito.
+    Se non disponibili, si usano i fallback serif di sistema.
+  -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&amp;family=Jost:ital,wght@0,300..600;1,300..500&amp;family=Cinzel:wght@400;500;600&amp;family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&amp;family=Playfair+Display:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&amp;family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&amp;family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&amp;family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&amp;display=swap" />
+
+  <style>
+    :root {
+      /* Sovrascritte da JS con il tema salvato dall'admin (localStorage) */
+      --primary: #c4561f;
+      --prim-rgb: 196,86,31;
+      --bg: #f3e8d4;
+      --bg-card: #fbf4e6;
+      --text: #2b1a12;
+      --muted: #7b6454;
+      --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+      --font-body: 'Jost', system-ui, sans-serif;
+      --font-label: 'Jost', system-ui, sans-serif;
+      --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    [hidden] { display: none !important; }
+
+    html, body { min-height: 100%; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 1.125rem;
+      line-height: 1.75;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      overflow-x: hidden;
+    }
+
+    ::selection { background: rgba(var(--prim-rgb), 0.2); color: var(--text); }
+
+    #particles { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+
+    .glow {
+      position: fixed; inset: 0; pointer-events: none; z-index: 1;
+      background: radial-gradient(ellipse 60% 50% at 50% 50%, rgba(var(--prim-rgb), 0.07) 0%, transparent 70%);
+    }
+
+    .frame {
+      position: fixed; z-index: 1; pointer-events: none;
+      inset: clamp(1rem, 3vw, 2rem);
+      border: 1px solid rgba(var(--prim-rgb), 0.08);
+      color: var(--primary);
+      opacity: 0; animation: fade 1s ease 0.4s forwards;
+    }
+    .corner { position: absolute; width: 32px; height: 32px; opacity: 0.45; }
+    .corner.tl { top: -1px; left: -1px; }
+    .corner.tr { top: -1px; right: -1px; transform: scaleX(-1); }
+    .corner.bl { bottom: -1px; left: -1px; transform: scaleY(-1); }
+    .corner.br { bottom: -1px; right: -1px; transform: scale(-1); }
+
+    main {
+      position: relative; z-index: 2;
+      min-height: 100vh; min-height: 100dvh;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: clamp(1.2rem, 3vw, 2rem);
+      text-align: center;
+      width: 100%; max-width: 640px; margin: 0 auto;
+      padding:
+        calc(clamp(2.5rem, 7vw, 4rem) + env(safe-area-inset-top, 0px))
+        clamp(1.5rem, 5vw, 3rem)
+        calc(clamp(2.5rem, 7vw, 4rem) + env(safe-area-inset-bottom, 0px));
+    }
+
+    .rise { opacity: 0; animation: rise 0.8s var(--ease-expo) forwards; }
+    .appear { opacity: 0; animation: fade 0.7s ease forwards; }
+
+    /* Logo / emblema */
+    .emblem {
+      width: clamp(72px, 18vw, 110px); height: clamp(72px, 18vw, 110px);
+      display: flex; align-items: center; justify-content: center;
+      border: 2px solid var(--text); border-radius: 28px;
+      background: rgba(var(--prim-rgb), 0.1);
+      box-shadow: 5px 5px 0 var(--text);
+    }
+    .emblem svg { width: 44%; height: 44%; opacity: 0.85; }
+    .emblem img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 4px 24px rgba(var(--prim-rgb), 0.2)); }
+    .emblem.has-logo { border: none; background: none; box-shadow: none; }
+
+    .eyebrow {
+      font-family: var(--font-label);
+      font-size: 0.52rem; letter-spacing: 0.45em; text-transform: uppercase;
+      color: var(--primary); margin-right: -0.45em;
+    }
+
+    /* Linea ornamentale */
+    .ornament { display: flex; align-items: center; gap: 0.8rem; width: min(340px, 80vw); }
+    .ornament .line { flex: 1; height: 1px; }
+    .ornament .line.l { background: linear-gradient(to right, transparent, rgba(var(--prim-rgb), 0.5)); transform-origin: left; }
+    .ornament .line.r { background: linear-gradient(to left, transparent, rgba(var(--prim-rgb), 0.5)); transform-origin: right; }
+    .ornament .line { transform: scaleX(0); animation: grow 1.2s var(--ease-expo) 0.6s forwards; }
+    .ornament .dia { flex-shrink: 0; transform: rotate(45deg) scale(0); animation: dia 0.5s ease forwards; }
+    .ornament .dia.a { width: 6px; height: 6px; background: var(--primary); animation-delay: 1s; }
+    .ornament .dia.b { width: 4px; height: 4px; border: 1px solid rgba(var(--prim-rgb), 0.6); animation-delay: 1.1s; }
+    .ornament .dia.c { width: 6px; height: 6px; background: var(--primary); animation-delay: 1.2s; }
+
+    h1 {
+      font-family: var(--font-display);
+      font-weight: 400;
+      font-size: clamp(1.8rem, 5.5vw, 3rem);
+      line-height: 1.15;
+      color: var(--text);
+    }
+    .message {
+      font-family: var(--font-body);
+      font-style: italic;
+      font-size: clamp(0.95rem, 2.5vw, 1.15rem);
+      line-height: 1.7;
+      color: var(--muted);
+      max-width: 480px;
+      margin: 0.9rem auto 0;
+    }
+
+    /* Stato connessione */
+    .status {
+      display: inline-flex; align-items: center; gap: 0.75rem;
+      font-family: var(--font-label);
+      font-size: 0.5rem; letter-spacing: 0.26em; text-transform: uppercase;
+      color: rgba(var(--prim-rgb), 0.85);
+    }
+    .status .pip {
+      width: 6px; height: 6px; background: var(--primary); transform: rotate(45deg);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    .status.checking .pip { animation-duration: 0.7s; }
+
+    .actions { display: flex; align-items: stretch; justify-content: center; gap: 0.8rem; flex-wrap: wrap; }
+
+    .btn {
+      font-family: var(--font-label);
+      font-size: 0.58rem; letter-spacing: 0.22em; text-transform: uppercase;
+      color: var(--text); background: var(--bg-card); text-decoration: none; cursor: pointer;
+      border: 2px solid var(--text); border-radius: 999px;
+      box-shadow: 3px 3px 0 var(--text);
+      padding: 0.8rem 1.5rem; line-height: 1.2;
+      display: inline-flex; align-items: center; gap: 0.6rem;
+      transition: background-color 0.2s ease, color 0.2s ease, transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .btn svg { width: 12px; height: 12px; flex-shrink: 0; }
+    .btn:hover, .btn:focus-visible { background: var(--primary); color: var(--bg); outline: none; transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--text); }
+    .btn.solid { background: var(--primary); color: var(--bg); }
+    .btn[disabled] { opacity: 0.6; cursor: progress; }
+
+    .foot { display: flex; flex-direction: column; align-items: center; gap: 0.3rem; margin-top: 0.2rem; }
+    .foot .tick { width: 24px; height: 1px; background: rgba(var(--prim-rgb), 0.25); }
+    .foot p { font-style: italic; font-size: 0.78rem; color: var(--muted); opacity: 0.55; }
+
+    @keyframes fade { to { opacity: 1; } }
+    @keyframes rise { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes grow { to { transform: scaleX(1); } }
+    @keyframes dia { to { transform: rotate(45deg) scale(1); } }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(var(--prim-rgb), 0.45); }
+      50% { box-shadow: 0 0 0 8px rgba(var(--prim-rgb), 0); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; animation-delay: 0ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="particles" aria-hidden="true"></canvas>
+  <div class="glow" aria-hidden="true"></div>
+
+  <div class="frame" aria-hidden="true">
+    <svg class="corner tl" viewBox="0 0 32 32" fill="none"><path d="M1 31V1H31" stroke="currentColor" stroke-width="1.2"/><circle cx="1" cy="1" r="2" fill="currentColor" fill-opacity="0.6"/></svg>
+    <svg class="corner tr" viewBox="0 0 32 32" fill="none"><path d="M1 31V1H31" stroke="currentColor" stroke-width="1.2"/><circle cx="1" cy="1" r="2" fill="currentColor" fill-opacity="0.6"/></svg>
+    <svg class="corner bl" viewBox="0 0 32 32" fill="none"><path d="M1 31V1H31" stroke="currentColor" stroke-width="1.2"/><circle cx="1" cy="1" r="2" fill="currentColor" fill-opacity="0.6"/></svg>
+    <svg class="corner br" viewBox="0 0 32 32" fill="none"><path d="M1 31V1H31" stroke="currentColor" stroke-width="1.2"/><circle cx="1" cy="1" r="2" fill="currentColor" fill-opacity="0.6"/></svg>
+  </div>
+
+  <main>
+    <div class="emblem rise" id="emblem" style="animation-delay:0s">
+      <!-- Segnale assente, tratto sottile come le icone del sito -->
+      <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M1.5 8.8a15 15 0 0 1 4.2-2.7"/>
+        <path d="M9.5 4.6A15 15 0 0 1 22.5 8.8"/>
+        <path d="M5 12.6a10 10 0 0 1 3.1-2"/>
+        <path d="M13 10.1a10 10 0 0 1 6 2.5"/>
+        <path d="M8.5 16.4a5 5 0 0 1 3-1.2"/>
+        <path d="M15 16.2a5 5 0 0 0-1.2-.8"/>
+        <circle cx="12" cy="20" r="0.6" fill="var(--primary)"/>
+        <path d="M2 2l20 20"/>
+      </svg>
+    </div>
+
+    <p class="eyebrow appear" id="siteName" style="animation-delay:0.15s">Emporio 46</p>
+
+    <div class="ornament" aria-hidden="true">
+      <span class="line l"></span><span class="dia a"></span><span class="dia b"></span><span class="dia c"></span><span class="line r"></span>
+    </div>
+
+    <div class="rise" style="animation-delay:0.25s">
+      <h1 id="title">Nessuna connessione</h1>
+      <p class="message" id="message">Sembra che il vostro dispositivo non sia collegato a internet. Controllate la rete e riprovate: i nostri tesori vi aspettano, non vanno da nessuna parte.</p>
+    </div>
+
+    <div class="status rise" id="status" role="status" aria-live="polite" style="animation-delay:0.4s">
+      <span class="pip" aria-hidden="true"></span>
+      <span id="statusText">In attesa della connessione…</span>
+    </div>
+
+    <div class="actions appear" style="animation-delay:0.7s">
+      <button type="button" class="btn solid" id="retry">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>
+        <span id="retryText">Riprova</span>
+      </button>
+      <a class="btn" id="phone" href="tel:+390555326258" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 11a19.79 19.79 0 01-3.07-8.67A2 2 0 012 .18h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 14h.01"/></svg>
+        <span id="phoneText">+39 055 532 6258</span>
+      </a>
+    </div>
+
+    <div class="foot appear" style="animation-delay:0.95s">
+      <span class="tick"></span>
+      <p id="tagline">Firenze · Arredi vintage e bijoux</p>
+    </div>
+  </main>
+
+  <script>
+  (function () {
+    'use strict';
+
+    /* ───────── Tema: stesse impostazioni dell'admin, salvate in localStorage ───────── */
+    var S = {};
+    try { S = JSON.parse(localStorage.getItem('mnt_settings') || '{}') || {}; } catch (e) {}
+
+    var COLOR_RE = /^(#[0-9a-f]{3,8}|rgba?\([\d\s.,%]+\))$/i;
+    function color(v, d) { return typeof v === 'string' && COLOR_RE.test(v.trim()) ? v.trim() : d; }
+    function font(v, d) { return typeof v === 'string' && /^[A-Za-z0-9 \-]{2,40}$/.test(v) ? v : d; }
+    function rgb(c, d) {
+      var m = /^#([0-9a-f]{3})$/i.exec(c);
+      if (m) { var h = m[1]; return [parseInt(h[0] + h[0], 16), parseInt(h[1] + h[1], 16), parseInt(h[2] + h[2], 16)]; }
+      m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i.exec(c);
+      if (m) return [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)];
+      m = /^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/i.exec(c);
+      if (m) return [+m[1], +m[2], +m[3]];
+      return d;
+    }
+
+    var root = document.documentElement;
+    var primary = color(S.primaryColor, '#c4561f');
+    var pr = rgb(primary, [196, 86, 31]);
+    root.style.setProperty('--primary', primary);
+    root.style.setProperty('--prim-rgb', pr.join(','));
+    root.style.setProperty('--bg', color(S.bgColor, '#f3e8d4'));
+    root.style.setProperty('--bg-card', color(S.bgCardColor, '#fbf4e6'));
+    root.style.setProperty('--text', color(S.textColor, '#2b1a12'));
+    root.style.setProperty('--muted', color(S.textMutedColor, '#7b6454'));
+    root.style.setProperty('--font-display', "'" + font(S.fontDisplay, 'Fraunces') + "', 'Fraunces', Georgia, serif");
+    root.style.setProperty('--font-body', "'" + font(S.fontBody, 'Jost') + "', 'Jost', system-ui, sans-serif");
+    root.style.setProperty('--font-label', "'" + font(S.fontLabel || S.fontBody, 'Jost') + "', 'Jost', system-ui, sans-serif");
+    var themeMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeMeta) themeMeta.setAttribute('content', color(S.bgColor, '#f3e8d4'));
+
+    /* ───────── Lingua (il sito non la persiste: si usa quella del dispositivo) ───────── */
+    var en = !/^it/i.test(navigator.language || 'it');
+    var T = en ? {
+      title: 'No connection',
+      doc: 'No connection · ',
+      msg: 'It looks like your device is not connected to the internet. Check your network and try again: our treasures are waiting, they are not going anywhere.',
+      wait: 'Waiting for connection…',
+      checking: 'Checking connection…',
+      still: 'Still offline. Trying again shortly.',
+      retry: 'Try again',
+      tag: 'Florence · Vintage furniture & jewellery'
+    } : {
+      title: 'Nessuna connessione',
+      doc: 'Nessuna connessione · ',
+      msg: 'Sembra che il vostro dispositivo non sia collegato a internet. Controllate la rete e riprovate: i nostri tesori vi aspettano, non vanno da nessuna parte.',
+      wait: 'In attesa della connessione…',
+      checking: 'Verifica in corso…',
+      still: 'Ancora senza rete. Riprovo a breve.',
+      retry: 'Riprova',
+      tag: 'Firenze · Arredi vintage e bijoux'
+    };
+
+    function $(id) { return document.getElementById(id); }
+    var siteName = (typeof S.siteName === 'string' && S.siteName.trim()) || 'Emporio 46';
+    root.lang = en ? 'en' : 'it';
+    document.title = T.doc + siteName;
+    $('siteName').textContent = siteName;
+    $('title').textContent = T.title;
+    $('message').textContent = T.msg;
+    $('statusText').textContent = T.wait;
+    $('retryText').textContent = T.retry;
+    $('tagline').textContent = T.tag;
+
+    // Telefono: il link tel: funziona anche senza internet
+    var phone = typeof S.telefono === 'string' ? S.telefono.trim() : '+39 055 532 6258';
+    if (/^[+\d][\d\s().\-]{5,24}$/.test(phone)) {
+      var a = $('phone');
+      a.href = 'tel:' + phone.replace(/[^\d+]/g, '');
+      $('phoneText').textContent = phone;
+      a.hidden = false;
+    }
+
+    // Logo del sito, se salvato e raggiungibile (altrimenti resta l'emblema)
+    var logo = S.maintenanceLogoUrl || S.logoUrl;
+    if (typeof logo === 'string' && /^(https?:\/\/|data:image\/)/i.test(logo)) {
+      var img = new Image();
+      img.alt = siteName;
+      img.onload = function () {
+        var em = $('emblem');
+        em.innerHTML = '';
+        em.className += ' has-logo';
+        em.appendChild(img);
+      };
+      img.src = logo;
+    }
+
+    /* ───────── Particelle dorate (come la pagina di manutenzione) ───────── */
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var canvas = $('particles');
+    var ctx = canvas.getContext && canvas.getContext('2d');
+    if (ctx) {
+      var W = 0, H = 0;
+      var resize = function () { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; };
+      resize();
+      window.addEventListener('resize', resize);
+      var N = 38, ps = [];
+      for (var i = 0; i < N; i++) {
+        ps.push({
+          x: Math.random() * W, y: Math.random() * H,
+          r: 0.5 + Math.random() * 1.8,
+          vx: (Math.random() - 0.5) * 0.28, vy: -0.12 - Math.random() * 0.22,
+          alpha: 0.05 + Math.random() * 0.28, pulse: Math.random() * Math.PI * 2
+        });
+      }
+      var draw = function (move) {
+        ctx.clearRect(0, 0, W, H);
+        for (var k = 0; k < ps.length; k++) {
+          var p = ps[k];
+          if (move) {
+            p.x += p.vx; p.y += p.vy; p.pulse += 0.018;
+            if (p.y < -10) { p.y = H + 10; p.x = Math.random() * W; }
+            if (p.x < -10) p.x = W + 10;
+            if (p.x > W + 10) p.x = -10;
+          }
+          var al = p.alpha * (0.6 + 0.4 * Math.sin(p.pulse));
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(' + pr[0] + ',' + pr[1] + ',' + pr[2] + ',' + al + ')';
+          ctx.fill();
+        }
+      };
+      if (reduce) {
+        draw(false);
+        window.addEventListener('resize', function () { draw(false); });
+      } else {
+        var loop = function () { draw(true); requestAnimationFrame(loop); };
+        loop();
+      }
+    }
+
+    /* ───────── Controllo connessione e ricarica automatica ───────── */
+    var statusEl = $('status'), statusText = $('statusText'), btn = $('retry');
+    var busy = false;
+
+    function setStatus(text, checking) {
+      statusText.textContent = text;
+      statusEl.classList.toggle('checking', !!checking);
+    }
+
+    // Prova a raggiungere il sito; ricarica solo se la risposta è davvero la nostra
+    // (evita falsi positivi con captive portal / Wi-Fi senza internet).
+    function check(manual) {
+      if (busy) return;
+      busy = true;
+      btn.disabled = true;
+      setStatus(T.checking, true);
+      fetch('/favicon.svg?_=' + Date.now(), { cache: 'no-store' })
+        .then(function (r) {
+          var type = r.headers.get('content-type') || '';
+          if (r.ok && type.indexOf('svg') !== -1) { location.reload(); return; }
+          throw new Error('not reachable');
+        })
+        .catch(function () {
+          setStatus(manual ? T.still : T.wait, false);
+          busy = false;
+          btn.disabled = false;
+        });
+    }
+
+    btn.addEventListener('click', function () { check(true); });
+    window.addEventListener('online', function () { check(false); });
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) check(false); });
+    setInterval(function () { if (!document.hidden) check(false); }, 10000);
+  })();
+  </script>
+</body>
+</html>

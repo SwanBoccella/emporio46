@@ -1,0 +1,23 @@
+# Dipendenze
+node_modules/
+
+# Build output
+dist/
+
+# Env locali (non committare mai le chiavi reali)
+.env
+.env.local
+.env.*.local
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# TypeScript cache
+*.tsbuildinfo
