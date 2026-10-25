@@ -1,7 +1,7 @@
 {
   "name": "emporio-46",
   "private": true,
-  "version": "65.0.0",
+  "version": "67.0.0",
   "type": "module",
   "engines": {
     "node": ">=18.0.0",

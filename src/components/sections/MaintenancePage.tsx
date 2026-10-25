@@ -1,10 +1,11 @@
 // @ts-nocheck
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Fragment } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useApp } from '../../context/AppContext'
 import { openLegal } from '../../App'
 import { safeHref } from '../../utils/safeUrl'
 import { deriveTheme } from '../../utils/themeColors'
+import HeroOrb from '../ui/HeroOrb'
 
 /* ─── Particle system ─── */
 function Particles({ color }: { color: string }) {
@@ -61,7 +62,7 @@ function Particles({ color }: { color: string }) {
     return () => { cancelAnimationFrame(animId); window.removeEventListener('resize', resize) }
   }, [color])
 
-  return <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0 }} />
+  return <canvas ref={canvasRef} style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0 }} />
 }
 
 /* ─── Ornamental line ─── */
@@ -87,34 +88,51 @@ function OrnamentLine({ primary }: { primary: string }) {
   )
 }
 
-/* ─── Countdown digit ─── */
-function Digit({ value, label, bg, border, text, primary, muted }: {
+/* ─── Countdown digit: carta "flip-clock" in vetro scuro ─── */
+function Digit({ value, label, bg, border, text, primary, muted, accent }: {
   value: number; label: string
-  bg: string; border: string; text: string; primary: string; muted: string
+  bg: string; border: string; text: string; primary: string; muted: string; accent?: boolean
 }) {
   const str = String(value).padStart(2, '0')
+  const notch = { position: 'absolute' as const, top: '50%', width: 5, height: 9, marginTop: -4.5, background: bg, border: `1px solid ${primary}33`, zIndex: 3 }
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-      <div style={{ position: 'relative', width: 'clamp(64px,14vw,88px)', height: 'clamp(70px,15vw,96px)' }}>
-        <div style={{ position: 'absolute', inset: 0, background: bg, border: `1px solid ${border}`, boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }} />
-        <div style={{ position: 'absolute', top: 0, left: 0, width: 8, height: 8, borderTop: `1px solid ${primary}80`, borderLeft: `1px solid ${primary}80` }} />
-        <div style={{ position: 'absolute', top: 0, right: 0, width: 8, height: 8, borderTop: `1px solid ${primary}80`, borderRight: `1px solid ${primary}80` }} />
-        <div style={{ position: 'absolute', bottom: 0, left: 0, width: 8, height: 8, borderBottom: `1px solid ${primary}80`, borderLeft: `1px solid ${primary}80` }} />
-        <div style={{ position: 'absolute', bottom: 0, right: 0, width: 8, height: 8, borderBottom: `1px solid ${primary}80`, borderRight: `1px solid ${primary}80` }} />
-        <div style={{ position: 'absolute', left: 0, right: 0, top: '50%', height: 1, background: `${primary}18` }} />
-        <AnimatePresence mode="popLayout">
+    <div style={{ flex: '1 1 0', minWidth: 0, maxWidth: 100, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.7rem' }}>
+      <div style={{
+        position: 'relative', width: '100%', aspectRatio: '5 / 6', borderRadius: 14, overflow: 'hidden',
+        background: `linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.03) 49.6%, rgba(0,0,0,0.30) 50.4%, rgba(0,0,0,0.12) 100%), ${bg}`,
+        border: `1px solid ${accent ? `${primary}8c` : border}`,
+        boxShadow: `inset 0 1px 0 rgba(255,255,255,0.16), inset 0 -14px 24px rgba(0,0,0,0.30), 0 12px 28px rgba(0,0,0,0.45)${accent ? `, 0 0 26px ${primary}40` : ''}`,
+      }}>
+        {/* riflesso morbido in alto */}
+        <div style={{ position: 'absolute', left: '8%', right: '8%', top: 0, height: 1, background: `linear-gradient(to right, transparent, ${primary}${accent ? 'cc' : '80'}, transparent)`, zIndex: 3 }} />
+        {/* cerniera centrale */}
+        <div style={{ position: 'absolute', left: 0, right: 0, top: '50%', height: 1, marginTop: -0.5, background: 'rgba(0,0,0,0.55)', boxShadow: '0 1px 0 rgba(255,255,255,0.07)', zIndex: 2 }} />
+        <div style={{ ...notch, left: -1, borderRadius: '0 4px 4px 0', borderLeft: 'none' }} />
+        <div style={{ ...notch, right: -1, borderRadius: '4px 0 0 4px', borderRight: 'none' }} />
+        <AnimatePresence mode="popLayout" initial={false}>
           <motion.span key={str}
-            style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display, Cinzel, serif)', fontSize: 'clamp(1.8rem, 5vw, 2.6rem)', color: text, fontWeight: 600, letterSpacing: '0.04em' }}
-            initial={{ y: -18, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 18, opacity: 0 }}
-            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>
+            style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display, Cinzel, serif)', fontSize: 'clamp(1.9rem, 9.5vw, 3rem)', fontWeight: 500, fontVariantNumeric: 'lining-nums tabular-nums', fontFeatureSettings: '"lnum" 1, "tnum" 1', color: text, textShadow: `0 0 18px ${primary}${accent ? '66' : '33'}, 0 2px 4px rgba(0,0,0,0.55)`, zIndex: 1 }}
+            initial={{ y: '-30%', opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: '30%', opacity: 0 }}
+            transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}>
             {str}
           </motion.span>
         </AnimatePresence>
       </div>
-      <span style={{ fontFamily: 'var(--font-display, Cinzel, serif)', fontSize: '0.4rem', letterSpacing: '0.28em', textTransform: 'uppercase', color: muted }}>
+      <span style={{ fontFamily: 'var(--font-display, Cinzel, serif)', fontSize: 'clamp(0.52rem, 2.4vw, 0.66rem)', letterSpacing: '0.24em', textTransform: 'uppercase', color: accent ? primary : muted, paddingLeft: '0.24em' }}>
         {label}
       </span>
     </div>
+  )
+}
+
+/* separatore a due punti tra le carte */
+function Colon({ primary }: { primary: string }) {
+  return (
+    <motion.div aria-hidden="true" animate={{ opacity: [0.9, 0.35, 0.9] }} transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+      style={{ display: 'flex', flexDirection: 'column', gap: 9, alignSelf: 'flex-start', marginTop: 'clamp(26px, 8vw, 40px)' }}>
+      <span style={{ width: 4, height: 4, borderRadius: '50%', background: primary, boxShadow: `0 0 8px ${primary}` }} />
+      <span style={{ width: 4, height: 4, borderRadius: '50%', background: primary, boxShadow: `0 0 8px ${primary}` }} />
+    </motion.div>
   )
 }
 
@@ -131,7 +149,7 @@ function IgIcon({ color }: { color: string }) {
 
 /* ─── Main component ─── */
 export default function MaintenancePage({ onExpired }: { onExpired: () => void }) {
-  const { settings } = useApp()
+  const { settings, t } = useApp()
 
   // Resolve theme colors
   const bg      = settings.bgColor        || '#080604'
@@ -190,11 +208,12 @@ export default function MaintenancePage({ onExpired }: { onExpired: () => void }
 
   return (
     <motion.div
+      data-lenis-prevent
       style={{
         position: 'fixed', inset: 0, zIndex: 50000,
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
         padding: 'clamp(1.5rem, 5vw, 3rem)',
-        overflow: 'hidden',
+        overflowX: 'hidden', overflowY: 'auto', overscrollBehavior: 'contain',   // su schermi bassi la pagina scorre
         ...bgStyle,
       }}
       initial={{ opacity: 0 }}
@@ -205,7 +224,7 @@ export default function MaintenancePage({ onExpired }: { onExpired: () => void }
       {/* Background image layer */}
       {hasBgImage && (
         <div style={{
-          position: 'absolute', inset: 0, zIndex: 0,
+          position: 'fixed', inset: 0, zIndex: 0,
           backgroundImage: `url(${settings.maintenanceBgImageUrl})`,
           backgroundSize: 'cover', backgroundPosition: 'center',
           filter: isDark ? 'brightness(0.25) saturate(0.7)' : 'brightness(0.55) saturate(0.6)',
@@ -215,11 +234,11 @@ export default function MaintenancePage({ onExpired }: { onExpired: () => void }
       <Particles color={primary} />
 
       {/* Radial glow */}
-      <div style={{ position: 'absolute', inset: 0, background: `radial-gradient(ellipse 60% 50% at 50% 50%, ${primary}${isDark ? '0a' : '14'} 0%, transparent 70%)`, pointerEvents: 'none', zIndex: 1 }} />
+      <div style={{ position: 'fixed', inset: 0, background: `radial-gradient(ellipse 60% 50% at 50% 50%, ${primary}${isDark ? '0a' : '14'} 0%, transparent 70%)`, pointerEvents: 'none', zIndex: 1 }} />
 
       {/* Frame corners */}
       <motion.div
-        style={{ position: 'absolute', inset: 'clamp(1rem, 3vw, 2rem)', border: `1px solid ${primary}14`, pointerEvents: 'none', zIndex: 1 }}
+        style={{ position: 'fixed', inset: 'clamp(1rem, 3vw, 2rem)', border: `1px solid ${primary}14`, pointerEvents: 'none', zIndex: 1 }}
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4, duration: 1 }}
       >
         <Corner style={{ top: -1, left: -1 }} />
@@ -229,7 +248,7 @@ export default function MaintenancePage({ onExpired }: { onExpired: () => void }
       </motion.div>
 
       {/* Main content */}
-      <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'clamp(1.2rem, 3vw, 2rem)', width: '100%', maxWidth: 640, textAlign: 'center' }}>
+      <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'clamp(1.2rem, 3vw, 2rem)', width: '100%', maxWidth: 640, textAlign: 'center', margin: 'auto 0' }}>
 
         {/* Logo */}
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}>
@@ -269,22 +288,22 @@ export default function MaintenancePage({ onExpired }: { onExpired: () => void }
         {hasCountdown && !expired && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.4 }}
             style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.4rem', width: '100%' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'clamp(0.6rem, 2vw, 1.2rem)' }}>
-              {timeLeft.d > 0 && (<>
-                <Digit value={timeLeft.d} label="Giorni" bg={bgCard} border={`${primary}38`} text={text} primary={primary} muted={muted} />
-                <div style={{ fontFamily: 'var(--font-display, Cinzel, serif)', fontSize: 'clamp(1.4rem,4vw,2rem)', color: `${primary}80`, lineHeight: 1, paddingTop: 'clamp(18px,3.5vw,26px)', userSelect: 'none' }}>:</div>
-              </>)}
-              <Digit value={timeLeft.h} label="Ore" bg={bgCard} border={`${primary}38`} text={text} primary={primary} muted={muted} />
-              <div style={{ fontFamily: 'var(--font-display, Cinzel, serif)', fontSize: 'clamp(1.4rem,4vw,2rem)', color: `${primary}80`, lineHeight: 1, paddingTop: 'clamp(18px,3.5vw,26px)', userSelect: 'none' }}>:</div>
-              <Digit value={timeLeft.m} label="Minuti" bg={bgCard} border={`${primary}38`} text={text} primary={primary} muted={muted} />
-              <div style={{ fontFamily: 'var(--font-display, Cinzel, serif)', fontSize: 'clamp(1.4rem,4vw,2rem)', color: `${primary}80`, lineHeight: 1, paddingTop: 'clamp(18px,3.5vw,26px)', userSelect: 'none' }}>:</div>
-              <Digit value={timeLeft.s} label="Secondi" bg={bgCard} border={`${primary}38`} text={text} primary={primary} muted={muted} />
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: 'clamp(6px, 2.2vw, 14px)', width: 'min(440px, 92vw)' }}>
+              {[
+                ...(timeLeft.d > 0 ? [['Giorni', timeLeft.d]] : []),
+                ['Ore', timeLeft.h], ['Minuti', timeLeft.m], ['Secondi', timeLeft.s],
+              ].map(([label, val], i, arr) => (
+                <Fragment key={label as string}>
+                  <Digit value={val as number} label={label as string} bg={bgCard} border={`${primary}40`} text={text} primary={primary} muted={muted} accent={i === arr.length - 1} />
+                  {i < arr.length - 1 && <Colon primary={primary} />}
+                </Fragment>
+              ))}
             </div>
             {/* Progress bar */}
             <div style={{ width: 'min(440px, 88vw)', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontFamily: 'var(--font-display, Cinzel, serif)', fontSize: '0.38rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: `${primary}80` }}>Avanzamento</span>
-                <span style={{ fontFamily: 'var(--font-display, Cinzel, serif)', fontSize: '0.42rem', letterSpacing: '0.1em', color: primary }}>{progressPct}%</span>
+                <span style={{ fontFamily: 'var(--font-display, Cinzel, serif)', fontSize: '0.58rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: `${primary}b3` }}>Avanzamento</span>
+                <span style={{ fontFamily: 'var(--font-display, Cinzel, serif)', fontSize: '0.64rem', letterSpacing: '0.1em', color: primary }}>{progressPct}%</span>
               </div>
               <div style={{ height: 4, background: `${primary}1a`, position: 'relative', overflow: 'hidden' }}>
                 <div style={{ position: 'absolute', left: 0, top: '50%', width: 3, height: 3, background: `${primary}4d`, transform: 'translateY(-50%) rotate(45deg)' }} />
@@ -295,6 +314,14 @@ export default function MaintenancePage({ onExpired }: { onExpired: () => void }
                   animate={{ x: ['-60px', '500px'] }} transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut', repeatDelay: 1.2 }} />
               </div>
             </div>
+          </motion.div>
+        )}
+
+        {/* Medaglione interattivo (lo stesso del titolo): tocca, trascina e tieni premuto per giocare */}
+        {!expired && (
+          <motion.div initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1], delay: 0.55 }}
+            style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+            <HeroOrb label={t.hero.label} size="clamp(170px, min(52vw, 30vh), 250px)" className="maint-orb" touchAction="none" />
           </motion.div>
         )}
 
@@ -359,7 +386,7 @@ export default function MaintenancePage({ onExpired }: { onExpired: () => void }
 
       {/* Hidden admin button */}
       <button onClick={() => window.dispatchEvent(new CustomEvent('mnt-open-admin'))}
-        style={{ position: 'absolute', bottom: '1.2rem', right: '1.5rem', background: 'none', border: 'none', cursor: 'pointer', opacity: 0.15, padding: '0.5rem', zIndex: 3 }}
+        style={{ position: 'fixed', bottom: '1.2rem', right: '1.5rem', background: 'none', border: 'none', cursor: 'pointer', opacity: 0.15, padding: '0.5rem', zIndex: 3 }}
         title="Admin">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={primary} strokeWidth="1.5"><circle cx="12" cy="8" r="4"/><path d="M6 20v-2a6 6 0 0112 0v2"/></svg>
       </button>

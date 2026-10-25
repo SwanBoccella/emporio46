@@ -30,7 +30,8 @@ const mix = (c: [number, number, number], to: number, k: number) =>
   `rgb(${Math.round(c[0] + (to - c[0]) * k)},${Math.round(c[1] + (to - c[1]) * k)},${Math.round(c[2] + (to - c[2]) * k)})`
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v))
 
-export default function HeroOrb({ label }: { label: string }) {
+export default function HeroOrb({ label, size = 'min(32vw, 380px)', className = 'hero-badge', touchAction = 'manipulation' }:
+  { label: string; size?: string; className?: string; touchAction?: string }) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const { settings, lang } = useApp()
@@ -403,10 +404,10 @@ export default function HeroOrb({ label }: { label: string }) {
   }, [primary, label, hint])
 
   return (
-    <div ref={wrapRef} className="hero-badge" data-cursor
-      style={{ justifySelf: 'center', position: 'relative', width: 'min(32vw, 380px)', aspectRatio: '1 / 1' }}>
+    <div ref={wrapRef} className={className} data-cursor
+      style={{ justifySelf: 'center', position: 'relative', width: size, aspectRatio: '1 / 1' }}>
       <canvas ref={canvasRef} role="img" aria-label={label}
-        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', cursor: 'pointer', touchAction: 'manipulation', userSelect: 'none' }} />
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', cursor: 'pointer', touchAction, userSelect: 'none' }} />
     </div>
   )
 }
