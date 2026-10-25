@@ -2,11 +2,11 @@
 
 **Sito web per negozio di arredi vintage e bijoux — React + TypeScript + Vite**
 
-Sito vetrina per **Emporio 46**, negozio di arredi vintage e bijoux in Via Giampaolo Orsini 46/A, Firenze. SPA completamente admin-driven: tutti i contenuti, i colori, i font e le funzionalità si configurano dal pannello di amministrazione integrato, senza toccare il codice. Testi, impostazioni e catalogo si salvano su Cloudflare D1; immagini, video e modello 3D caricati dall'admin si salvano su Cloudflare R2 (`/media/<id>`): tutto è visibile a ogni visitatore. `localStorage` fa solo da cache.
+Sito vetrina per **Emporio 46**, negozio di arredi vintage e bijoux in Via Giampaolo Orsini 46/A, Firenze. SPA completamente admin-driven: tutti i contenuti, i colori, i font e le funzionalità si configurano dal pannello di amministrazione integrato, senza toccare il codice. Testi, impostazioni e catalogo si salvano sul Gist; immagini e modello 3D caricati dall'admin si salvano su Netlify Blobs (`/media/<id>`): tutto è visibile a ogni visitatore. `localStorage` fa solo da cache.
 
 ---
 
-> **v58 – Cloudflare.** Il sito è pubblicato come **Cloudflare Worker** con file statici: i contenuti del pannello admin stanno in **Cloudflare D1** (tabella `site_data`), i file caricati (immagini, video di sfondo, modello 3D) in **Cloudflare R2**. Il **Gist** è ora opzionale (copia di sicurezza / fonte da cui migrare i dati esistenti). I visitatori leggono da `/api/site-data`; se il server non risponde, il sito ricade sul Gist. `sitemap.xml` e `robots.txt` sono generati dal Worker con il dominio reale.
+> **v57_9 – archivio contenuti.** Il pannello admin salva su **Netlify Database** (tabella `site_data`) e **Netlify Blobs**; il **Gist** resta come copia di sicurezza e come fonte da cui i dati esistenti vengono migrati al primo salvataggio. I visitatori leggono da `/.netlify/functions/site-data`; se il server non risponde, il sito ricade sul Gist.
 
 ## Indice
 
@@ -17,7 +17,7 @@ Sito vetrina per **Emporio 46**, negozio di arredi vintage e bijoux in Via Giamp
 - [Pannello Admin](#pannello-admin)
 - [Avvio locale](#avvio-locale)
 - [Build e deploy](#build-e-deploy)
-  - [Deploy su Cloudflare](#deploy-su-cloudflare)
+  - [Deploy su Netlify con dominio Namecheap](#deploy-su-netlify-con-dominio-namecheap)
 - [Configurazione EmailJS](#configurazione-emailjs)
 - [Variabili d'ambiente](#variabili-dambiente)
 - [Pagina offline](#pagina-offline)
@@ -67,7 +67,7 @@ emporio-46/
 │   ├── favicon.svg
 │   ├── offline.html            # Pagina mostrata quando manca la connessione
 │   ├── sw.js                   # Service worker: serve offline.html se il sito non è raggiungibile
-│   └── _headers                # Header di sicurezza e cache (letti da Cloudflare Assets)
+│   └── _redirects              # Regola SPA per Netlify
 ├── src/
 │   ├── components/
 │   │   ├── admin/
@@ -106,9 +106,7 @@ emporio-46/
 ├── .gitignore
 ├── index.html
 ├── package.json
-├── wrangler.jsonc              # Configurazione Cloudflare (Worker, Assets, D1, R2)
-├── worker/                     # API: admin, contenuti (D1), file (R2), proxy Groq, sitemap/robots
-├── migrations/                 # Schema D1 (applicato anche in automatico dal Worker)
+├── netlify.toml
 ├── tailwind.config.js
 ├── tsconfig.json
 └── vite.config.ts
@@ -146,7 +144,7 @@ emporio-46/
   - **Appuntamento**: nome, cognome, email, telefono, data, ora, note
   - **Richiesta oggetto**: categoria, descrizione, note
   - **Richiesta stima**: descrizione oggetto, note
-- Integrazione EmailJS configurabile dall'admin **oppure** con le variabili di build `VITE_EMAILJS_*` su Cloudflare (vedi [Variabili d'ambiente](#variabili-dambiente))
+- Integrazione EmailJS configurabile dall'admin **oppure** con le variabili `VITE_EMAILJS_*` su Netlify (vedi [Variabili d'ambiente](#variabili-dambiente))
 - Pulsante WhatsApp con testo prefill dinamico
 
 ### Pagine legali
@@ -241,47 +239,42 @@ Il sito è disponibile su `http://localhost:5173`.
 
 ## Build e deploy
 
-### Deploy su Cloudflare
+### Deploy su Netlify con dominio Namecheap
 
-Il progetto è un **Worker con Static Assets** (non Pages): `wrangler.jsonc` dichiara il Worker (`worker/index.mjs`), la cartella `dist/` e i binding **D1** (`DB`) e **R2** (`FILES`).
-
-**Passo 1 — Collega il repository (Workers Builds)**
-Cloudflare → *Workers & Pages* → *Create* → *Import a repository* e imposta:
-
-| Campo | Valore |
-|---|---|
-| Build command | `npm run build` |
-| Deploy command | `npx wrangler deploy` |
-| Root directory | `/` |
-| Variabile di build `NODE_VERSION` | `22` *(opzionale, se serve)* |
-
-Al primo deploy Wrangler crea da solo il database D1 `emporio46-db` e il bucket R2 `emporio46-files` (provisioning automatico). Lo schema D1 viene creato dal Worker alla prima richiesta.
-Se preferisci crearli a mano: `npx wrangler d1 create emporio46-db` (incolla il `database_id` in `wrangler.jsonc`) e `npx wrangler r2 bucket create emporio46-files`.
-
-**Passo 2 — Variabili e secret** (vedi la sezione successiva), poi rifai il deploy.
-
-**Passo 3 — Dominio personalizzato**
-*Workers & Pages → emporio46 → Settings → Domains & Routes → Add → Custom domain* → `il-tuo-dominio.it`. Se il dominio è su Cloudflare (nameserver Cloudflare) DNS e certificato HTTPS sono automatici. Se è registrato altrove (es. Namecheap), imposta nei loro pannelli i nameserver Cloudflare indicati dalla procedura *Add a site*.
-
-**Passo 4 — SEO**
-- `https://tuo-dominio/sitemap.xml` e `https://tuo-dominio/robots.txt` sono generati dal Worker con il dominio con cui vengono richiesti (nessuna configurazione); la sitemap include la home, la data dell'ultimo salvataggio e le foto degli oggetti visibili nel catalogo.
-- Invia la sitemap a **Google Search Console** (e Bing Webmaster Tools).
-- In **Admin → SEO** imposta *canonical* e immagine di anteprima sul dominio definitivo.
-
-**Prova in locale con il Worker vero** (login admin, salvataggio, upload, AI):
+**Passo 1 — Build**
 ```bash
-cp .env.example .dev.vars   # lascia solo le righe segrete: ADMIN_PASSWORD=…, GROQ_API_KEY=…
-npm run preview:cf          # build + wrangler dev (D1 e R2 simulati in locale)
+npm install && npm run build
 ```
-`npm run dev` (solo Vite) non esegue il Worker: l'admin lavora in locale con password `dev`.
 
-> Il fallback SPA è gestito da `"not_found_handling": "single-page-application"` in `wrangler.jsonc`: non serve nessun file `_redirects`.
+**Passo 2 — Netlify**
+
+*Opzione A (drag & drop):*
+- Netlify → "Add new site" → "Deploy manually" → trascina la cartella `dist/`
+
+*Opzione B (GitHub, consigliata):*
+- Netlify → "Import an existing project" → GitHub
+- Build command: `npm run build`
+- Publish directory: `dist`
+
+**Passo 3 — Dominio custom su Netlify**
+1. Netlify → "Domain settings" → "Add custom domain" → `il-tuo-dominio.it`
+2. Copia i nameserver forniti da Netlify (es. `dns1.p01.nsone.net`)
+
+**Passo 4 — Namecheap DNS**
+1. namecheap.com → Domain List → `il-tuo-dominio.it` → **Manage**
+2. Nameservers → **Custom DNS** → inserisci i nameserver Netlify
+3. Salva (propagazione DNS: 1–4 ore)
+
+**Passo 5 — HTTPS**
+Certificato SSL Let's Encrypt attivato automaticamente da Netlify dopo la propagazione.
+
+> Il file `public/_redirects` (`/* /index.html 200`) è indispensabile per il routing SPA. Non eliminarlo.
 
 ---
 
 ## Configurazione EmailJS
 
-EmailJS si configura dall'admin panel (**funziona per i visitatori solo se la sincronizzazione Gist è attiva** (`VITE_GIST_ID` + login admin sul server), perché le impostazioni dell'admin altrimenti restano nel suo browser) **oppure** con le variabili di build `VITE_EMAILJS_*` su Cloudflare (Settings → Build → Variables and secrets, poi nuovo deploy), che funzionano sempre. Nel pannello (Impostazioni → EmailJS) trovi lo stato della sincronizzazione e il pulsante **Invia email di prova**.
+EmailJS si configura dall'admin panel (**funziona per i visitatori solo se la sincronizzazione Gist è attiva** (`VITE_GIST_ID` + login admin sul server), perché le impostazioni dell'admin altrimenti restano nel suo browser) **oppure** con le variabili d'ambiente `VITE_EMAILJS_*` su Netlify (Site configuration → Environment variables, poi nuovo deploy), che funzionano sempre. Nel pannello (Impostazioni → EmailJS) trovi lo stato della sincronizzazione e il pulsante **Invia email di prova**.
 
 1. Crea un account su [emailjs.com](https://www.emailjs.com)
 2. Crea un **Email Service** (Gmail, SMTP, ecc.) → annota il **Service ID**
@@ -301,44 +294,44 @@ Poi, nel pannello admin del sito:
 
 ## Variabili d'ambiente
 
-**Pubbliche** (`VITE_*`: finiscono nel sito, solo valori non segreti) → *Workers & Pages → emporio46 → Settings → **Build** → Variables and secrets*. Valgono dal build successivo.
+Si impostano su **Netlify → Site configuration → Environment variables** e valgono dal deploy successivo.
+
+**Pubbliche** (finiscono nel sito: contengono solo valori non segreti)
 
 | Variabile | A cosa serve |
 |---|---|
+| `VITE_GIST_ID` | ID del Gist pubblico da cui tutti i visitatori leggono i contenuti |
 | `VITE_EMAILJS_SERVICE`, `VITE_EMAILJS_PUBLIC_KEY`, `VITE_EMAILJS_TEMPLATE`, `VITE_EMAILJS_TEMPLATE_CLIENT` | EmailJS (opzionali: in alternativa si impostano dal pannello) |
-| `VITE_GIST_ID` | *(opzionale)* ID del Gist letto come fallback |
 
-**Segrete, solo lato server** (nessun prefisso `VITE_`: non entrano mai nel sito) → *Settings → **Variables and secrets** (del Worker), tipo **Secret***, oppure `npx wrangler secret put NOME`.
+**Segrete, solo lato server** (nessun prefisso `VITE_`: non entrano mai nel sito)
 
-| Secret | A cosa serve |
+| Variabile | A cosa serve |
 |---|---|
-| `ADMIN_PASSWORD` | Password iniziale del pannello admin. Scegline una lunga (16+ caratteri). Dal pannello (**Password**) si può cambiare: la nuova viene salvata cifrata (PBKDF2) in D1 e sostituisce questa |
-| `GROQ_API_KEY` | Chiave Groq (`gsk_…`) per le funzioni AI. Usata solo da `/api/groq-proxy`, che risponde solo a chi ha fatto login admin |
-| `SESSION_SECRET` | *(consigliato)* stringa casuale lunga che firma le sessioni admin (12 ore) |
+| `ADMIN_PASSWORD` | Password iniziale del pannello admin, verificata dalla Netlify Function. Scegline una lunga (16+ caratteri). Dal pannello (**Password**) si può cambiare: la nuova viene salvata cifrata (scrypt) in Netlify Blobs e sostituisce questa |
 | `ADMIN_PASSWORD_FORCE_ENV` | *(opzionale)* `1` = ignora la password cambiata dal pannello e riusa `ADMIN_PASSWORD` (recupero se la dimentichi) |
-| `GIST_ID`, `GIST_TOKEN` | *(opzionali)* copia di sicurezza su GitHub Gist (token *classic* con **solo** lo scope `gist`) |
+| `GIST_TOKEN` | Token GitHub *classic* con **solo** lo scope `gist`. Serve alla Function per scrivere sul Gist |
+| `GROQ_API_KEY` | Chiave Groq (`gsk_…`) per le funzioni AI. Usata solo dalla Function `groq-proxy`, che risponde solo a chi ha fatto login admin |
+| `GIST_ID` | *(opzionale)* ID del Gist lato server; se assente la Function usa `VITE_GIST_ID` |
 
-> Usa il tipo **Secret** e non "Text": `wrangler.jsonc` ha `keep_vars: true`, quindi i deploy non cancellano ciò che imposti dalla dashboard.
+> Segna `ADMIN_PASSWORD`, `GIST_TOKEN` e `GROQ_API_KEY` come **secret** (opzione "Contains secret values") e limita lo scope alle *Functions*.
 
-### Checklist Cloudflare (riepilogo)
+### Checklist Netlify (riepilogo)
 
-| Voce | Obbligatoria | Dove |
+| Variabile | Obbligatoria | Tipo |
 |---|---|---|
-| `ADMIN_PASSWORD` | sì | secret del Worker |
-| `SESSION_SECRET` | consigliata | secret del Worker |
-| `GROQ_API_KEY` | per l'AI | secret del Worker |
-| `VITE_EMAILJS_SERVICE`, `VITE_EMAILJS_PUBLIC_KEY`, `VITE_EMAILJS_TEMPLATE` | per il form contatti | variabili di build |
-| D1 `DB` e R2 `FILES` | sì | creati al deploy da `wrangler.jsonc` |
-| `VITE_EMAILJS_TEMPLATE_CLIENT`, `VITE_GIST_ID`, `GIST_ID`, `GIST_TOKEN` | no | — |
+| `VITE_GIST_ID` | sì | pubblica |
+| `ADMIN_PASSWORD` | sì | segreta |
+| `GIST_TOKEN` | sì | segreta |
+| `GROQ_API_KEY` | per l'AI | segreta |
+| `VITE_EMAILJS_SERVICE`, `VITE_EMAILJS_PUBLIC_KEY`, `VITE_EMAILJS_TEMPLATE` | per il form contatti | pubbliche |
+| `VITE_EMAILJS_TEMPLATE_CLIENT`, `GIST_ID` | no | — |
 
-Dopo aver inserito variabili o secret fai un nuovo deploy. Su EmailJS aggiungi il dominio del sito in *Allowed Origins*.
-
-> **Piano Cloudflare:** il piano Workers gratuito limita il tempo di CPU a ~10 ms per richiesta; login, cambio password e upload di file grandi possono superarlo. Per un uso stabile dell'admin è consigliato il piano **Workers Paid** (5 $/mese).
+Dopo aver inserito le variabili fai un nuovo deploy. Su EmailJS aggiungi il dominio del sito in *Allowed Origins*.
 
 ### Sfondi: immagini e video (Admin → Sfondi & Mappa)
 Ogni zona (barra, **menu mobile**, copertina, sezioni, footer) ha immagine **e** video di sfondo, con gli stessi controlli: opacità, luminosità, sfocatura, seppia, posizione, velo, sfumatura dei bordi. Il video (MP4 H.264 o WebM, max 36 MB, meglio < 6 MB) si carica dall'admin o si incolla come URL; il fotogramma iniziale (poster) viene creato in automatico. Rimuovendo il video resta l'immagine. I tre video predefiniti sono in `public/bg/` (copertina, menu, footer). Se in passato avevi già modificato gli sfondi di copertina o footer, premi **↺ Default** su quella card per ripartire dai nuovi valori.
 
-I video caricati vanno su Cloudflare R2 e sono serviti da `/media/<id>` con supporto Range (necessario a Safari/iOS).
+I video caricati vanno su Netlify Blobs e sono serviti da `/media/<id>` con supporto Range (necessario a Safari/iOS).
 
 ### Trasparenza del footer
 Nella card **Footer** di *Sfondi & Mappa*: opacità, sfocatura e bordo dei riquadri di testo (0 = completamente trasparenti).
@@ -363,7 +356,7 @@ Se chiudi la pagina con modifiche non ancora sul Gist il browser chiede conferma
 
 ### Come funziona la sicurezza del Gist
 
-- Il Gist è **pubblico in lettura** (i visitatori lo leggono dal browser) ma **si scrive solo tramite `worker/index.mjs` (`/api/admin-api`)**, che richiede una sessione firmata ottenuta con `ADMIN_PASSWORD` (scade dopo 12 ore).
+- Il Gist è **pubblico in lettura** (i visitatori lo leggono dal browser) ma **si scrive solo tramite `netlify/functions/admin-api.mjs`**, che richiede una sessione firmata ottenuta con `ADMIN_PASSWORD` (scade dopo 12 ore).
 - Il token GitHub non è mai nel codice del sito. Il browser non lo vede.
 - Ogni salvataggio controlla la revisione del Gist: se un altro dispositivo ha salvato nel frattempo, il salvataggio viene rifiutato (conflitto) invece di sovrascrivere.
 - La password admin non viene mai scritta nel Gist. Il Gist non deve contenere dati riservati: è leggibile da chiunque.
@@ -371,7 +364,7 @@ Se chiudi la pagina con modifiche non ancora sul Gist il browser chiede conferma
 
 ### Chiave Groq (AI)
 
-In produzione la chiave è il secret `GROQ_API_KEY` su Cloudflare (vedi tabella sopra): non finisce mai nel sito, nel Gist o nel codice. In alternativa si può inserire una chiave diretta nel pannello (Impostazioni → Chiave API Groq): resta solo nel browser dell'admin e su un nuovo dispositivo va reinserita. Il pulsante **Test** verifica sia il modello testo sia quello visione. I modelli sono nel file `src/utils/groq.ts` e si possono sovrascrivere dal pannello quando Groq ne dismette qualcuno.
+In produzione la chiave è `GROQ_API_KEY` su Netlify (vedi tabella sopra): non finisce mai nel sito, nel Gist o nel codice. In alternativa si può inserire una chiave diretta nel pannello (Impostazioni → Chiave API Groq): resta solo nel browser dell'admin e su un nuovo dispositivo va reinserita. Il pulsante **Test** verifica sia il modello testo sia quello visione. I modelli sono nel file `src/utils/groq.ts` e si possono sovrascrivere dal pannello quando Groq ne dismette qualcuno.
 
 ### Sviluppo locale
 
@@ -380,9 +373,9 @@ cp .env.example .env.local
 npm install && npm run dev
 ```
 
-In locale la chiave Groq va in `.env.local` come `VITE_GROQ_DEV_KEY` (**solo sviluppo**, mai in produzione).
+In locale la chiave Groq va in `.env.local` come `VITE_GROQ_DEV_KEY` (**solo sviluppo**, mai su Netlify).
 
-Con `npm run dev` il Worker non esiste: l'accesso admin usa la password `dev` e i salvataggi restano in locale. Per provare il login reale e la sincronizzazione usa `npm run preview:cf` (build + `wrangler dev`, con D1 e R2 simulati in locale).
+Con `npm run dev` la Function non esiste: l'accesso admin usa la password `dev` e i salvataggi restano in locale. Per provare il login reale e la sincronizzazione usa la [Netlify CLI](https://docs.netlify.com/cli/get-started/) (`netlify dev`).
 
 ---
 
@@ -394,7 +387,7 @@ Il sito usa un'unica palette governata da variabili CSS (`--color-primary`, `--c
 - **Font:** Fraunces (titoli), Jost (testi ed etichette). Si cambiano dall'admin; tutti i font selezionabili sono già caricati in `src/index.css`.
 - **Stile grafico:** forme morbide, bordi netti con ombra piena, etichette a bollino, medaglione rotante nell'Hero, nastro scorrevole inclinato. Le regole sono raccolte in fondo a `src/index.css` (sezione "skin retrò pop").
 - **Immagini:** hero, "Il negozio", footer e sfondo recensioni sono opzionali; senza immagine si vede un'alternativa tipografica.
-- **Dati dell'admin:** salvati nel browser (`localStorage`) e, se configurato, sincronizzati con un GitHub Gist tramite il Worker Cloudflare (D1, con copia Gist opzionale). I visitatori vedono i dati del server o quelli predefiniti in `AppContext.tsx`.
+- **Dati dell'admin:** salvati nel browser (`localStorage`) e, se configurato, sincronizzati con un GitHub Gist tramite la Netlify Function. I visitatori vedono i dati del Gist o quelli predefiniti in `AppContext.tsx`.
 
 ---
 
@@ -518,4 +511,4 @@ Tutti i diritti riservati.
 **Test**: `npm run test:groq` (Node ≥ 22) prova client Groq, fallback dei modelli e parsing con un Groq simulato.
 
 ### Chiave Groq in produzione (aggiornamento v57.1)
-La chiave **non deve mai avere il prefisso `VITE_`** (finirebbe nel bundle pubblico). Su Cloudflare imposta il secret `GROQ_API_KEY`: il Worker (`/api/groq-proxy`, in `worker/index.mjs`) la usa lato server e risponde solo a chi ha fatto login admin. In locale (`npm run dev`) la chiave sta in `.env.local` come `VITE_GROQ_DEV_KEY` (solo dev, eliminata dalla build: controlla con `grep -r gsk_ dist`). Nota: se un'analisi foto molto lunga va in timeout, riprova o inserisci una chiave diretta nel pannello.
+La chiave **non deve mai avere il prefisso `VITE_`** (finirebbe nel bundle pubblico). Su Netlify imposta `GROQ_API_KEY` (segreta): la Function `netlify/functions/groq-proxy.mjs` la usa lato server e risponde solo a chi ha fatto login admin. In locale (`npm run dev`) la chiave sta in `.env.local` come `VITE_GROQ_DEV_KEY` (solo dev, eliminata dalla build: controlla con `grep -r gsk_ dist`). Nota: le Function sincrone Netlify hanno un timeout di ~10 s; se un'analisi foto lunga va in timeout, riprova o inserisci una chiave diretta nel pannello.

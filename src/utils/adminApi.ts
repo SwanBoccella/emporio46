@@ -1,8 +1,7 @@
-// ─── Autenticazione admin + salvataggio (Cloudflare D1 + R2, copia Gist opzionale) tramite il Worker /api/* ────────
-// Il token GitHub e la password admin vivono SOLO sul server (secret Cloudflare):
+// ─── Autenticazione admin + salvataggio (Netlify Database + Blobs, copia Gist) tramite Netlify Function ────────
+// Il token GitHub e la password admin vivono SOLO sul server (variabili Netlify):
 // nel browser resta soltanto un token di sessione firmato che scade dopo 12 ore.
-const ENDPOINT = '/api/admin-api'
-const UPLOAD_ENDPOINT = '/api/asset-put'
+const ENDPOINT = '/.netlify/functions/admin-api'
 const TK = 'mnt_admin_token'
 
 function tokenExp(t: string): number {
@@ -32,12 +31,12 @@ export async function adminLogin(password: string): Promise<LoginResult> {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'login', password }),
     })
-    if (res.status === 404 || res.status === 405) return { ok: false, reason: 'unavailable', message: 'Servizio di accesso non disponibile (Worker Cloudflare non pubblicato).' }
+    if (res.status === 404 || res.status === 405) return { ok: false, reason: 'unavailable', message: 'Servizio di accesso non disponibile (Netlify Function non pubblicata).' }
     let j: any = null
     try { j = await res.json() } catch { return { ok: false, reason: 'unavailable', message: 'Servizio di accesso non disponibile.' } }
     if (res.ok && j?.token) { try { localStorage.setItem(TK, j.token) } catch { /* noop */ } return { ok: true } }
     if (res.status === 401) return { ok: false, reason: 'wrong', message: 'Password non corretta' }
-    if (j?.error === 'not_configured') return { ok: false, reason: 'config', message: j.message || 'Server non configurato (secret Cloudflare mancanti).' }
+    if (j?.error === 'not_configured') return { ok: false, reason: 'config', message: j.message || 'Server non configurato (variabili Netlify mancanti).' }
     return { ok: false, reason: 'error', message: 'Errore di accesso, riprova.' }
   } catch {
     return { ok: false, reason: 'unavailable', message: 'Impossibile contattare il server.' }
@@ -80,7 +79,7 @@ export async function changeAdminPassword(current: string, next: string): Promis
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ action: 'change_password', current, next }),
     })
-    if (res.status === 404 || res.status === 405) return { ok: false, message: 'Servizio non disponibile (Worker Cloudflare non pubblicato, o modalità sviluppo).' }
+    if (res.status === 404 || res.status === 405) return { ok: false, message: 'Servizio non disponibile (Netlify Function non pubblicata, o modalità sviluppo).' }
     let j: any = null
     try { j = await res.json() } catch { /* noop */ }
     if (res.ok && j?.token) { try { localStorage.setItem(TK, j.token) } catch { /* noop */ } return { ok: true } }
@@ -91,13 +90,19 @@ export async function changeAdminPassword(current: string, next: string): Promis
   }
 }
 
-// ─── Upload file (immagini / video / modello 3D) su Cloudflare R2, a pezzi ───────────
-const CHUNK = 3 * 1024 * 1024   // 3 MB per pezzo, inviati come corpo binario (niente base64)
+// ─── Upload file (immagini / modello 3D) su Netlify Blobs, a pezzi ───────────
+const CHUNK = 3 * 1024 * 1024   // 3 MB grezzi → ~4 MB in base64, sotto il limite di 6 MB delle Function
 
 const newAssetId = () => {
   const a = new Uint8Array(16); crypto.getRandomValues(a)
   return Array.from(a, b => b.toString(16).padStart(2, '0')).join('')
 }
+const blobToBase64 = (b: Blob) => new Promise<string>((res, rej) => {
+  const r = new FileReader()
+  r.onload = () => res(String(r.result).split(',')[1] || '')
+  r.onerror = () => rej(r.error)
+  r.readAsDataURL(b)
+})
 
 export type AssetResult = { ok: true; id: string; parts: number } | { ok: false; message: string }
 
@@ -107,15 +112,14 @@ export async function adminUploadAsset(file: Blob, mime: string, name: string, o
   const id = newAssetId()
   const total = Math.max(1, Math.ceil(file.size / CHUNK))
   for (let i = 0; i < total; i++) {
-    const part = file.slice(i * CHUNK, (i + 1) * CHUNK)
+    const data = await blobToBase64(file.slice(i * CHUNK, (i + 1) * CHUNK))
     let ok = false, lastMsg = 'Upload non riuscito.'
     for (let attempt = 0; attempt < 3 && !ok; attempt++) {      // 3 tentativi per pezzo (rete mobile)
       try {
-        const qs = new URLSearchParams({ id, index: String(i), total: String(total), mime, name: name.slice(0, 120) })
-        const res = await fetch(`${UPLOAD_ENDPOINT}?${qs}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/octet-stream', Authorization: `Bearer ${token}` },
-          body: part,
+        const res = await fetch(ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ action: 'asset_put', id, index: i, total, mime, name, data }),
         })
         let j: any = null
         try { j = await res.json() } catch { /* noop */ }

@@ -137,7 +137,7 @@ export function loadArmchair(src: ArmchairSource = {}): Promise<THREE.Group> {
         const worker = async () => {
           while (next < src.asset!.parts) {
             const i = next++
-            const r = await fetch(`/api/asset?id=${src.asset!.id}&part=${i}`)
+            const r = await fetch(`/.netlify/functions/asset?id=${src.asset!.id}&part=${i}`)
             if (!r.ok) throw new Error('asset ' + r.status)
             parts[i] = await r.arrayBuffer()
           }

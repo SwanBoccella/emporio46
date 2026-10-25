@@ -55,7 +55,7 @@ const payload = Buffer.from(JSON.stringify({ exp: Date.now() + 3600_000 })).toSt
 store.mnt_admin_token = payload + '.firma'
 let urls = []
 globalThis.fetch = async (url, init) => { urls.push([url, init.headers.Authorization]); return ok('via proxy') }
-t = await g.groqText('x'); assert.equal(t,'via proxy'); assert.equal(urls[0][0],'/api/groq-proxy'); assert.equal(urls[0][1],'Bearer '+store.mnt_admin_token); console.log('10 ok')
+t = await g.groqText('x'); assert.equal(t,'via proxy'); assert.equal(urls[0][0],'/.netlify/functions/groq-proxy'); assert.equal(urls[0][1],'Bearer '+store.mnt_admin_token); console.log('10 ok')
 
 // 11. né chiave né sessione -> messaggio chiaro, nessuna richiesta
 delete store.mnt_admin_token; urls=[]
