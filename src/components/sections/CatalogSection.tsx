@@ -6,6 +6,7 @@ import SectionBackdrop from '../ui/SectionBackdrop'
 import type { CatalogItem } from '../../types'
 import { waItemLink } from '../../utils/whatsapp'
 import { safeHref } from '../../utils/safeUrl'
+import { REVEAL_VP } from '../../utils/reveal'
 
 const ICONS: Record<string, string> = {
   mobili: '🪑', lampade: '💡', bijoux: '📿', specchi: '🪞', cornici: '🖼',
@@ -921,17 +922,17 @@ export default function CatalogSection() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '1.5rem' }}>
               <div>
                 <motion.p className="section-label" style={{ marginBottom: '1rem' }}
-                  initial={{ opacity: 0, y: 20 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.7 }}>
+                  initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={REVEAL_VP} transition={{ duration: 1.12 }}>
                   {t.catalog.label}
                 </motion.p>
                 <motion.h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem,5vw,3.8rem)', fontWeight: 400, color: 'var(--color-text)', lineHeight: 1.1, margin: 0 }}
-                  initial={{ opacity: 0, y: 20 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.7, delay: 0.1 }}>
+                  initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={REVEAL_VP} transition={{ duration: 1.12, delay: 0.1 }}>
                   {t.catalog.title.replace(t.catalog.titleWord, '')} <em style={{ color: 'var(--color-primary-text, var(--color-primary))', fontStyle: 'italic' }}>{t.catalog.titleWord}</em>
                 </motion.h2>
               </div>
 
               {/* "Vedi tutto" CTA */}
-              <motion.div initial={{ opacity: 0, x: 20 }} animate={inView ? { opacity: 1, x: 0 } : {}} transition={{ duration: 0.7, delay: 0.2 }}>
+              <motion.div initial={{ opacity: 0, x: 20 }} whileInView={{ opacity: 1, x: 0 }} viewport={REVEAL_VP} transition={{ duration: 1.12, delay: 0.2 }}>
                 <motion.button
                   onClick={() => setShowFullCatalog(true)}
                   style={{ borderRadius: 999,
@@ -993,7 +994,7 @@ export default function CatalogSection() {
 
           {/* Footer CTA area */}
           <motion.div style={{ textAlign: 'center', marginTop: '4.5rem', padding: '0 clamp(1.5rem, 7vw, 8rem)' }}
-            initial={{ opacity: 0, y: 20 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.7, delay: 0.4 }}>
+            initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={REVEAL_VP} transition={{ duration: 1.12, delay: 0.4 }}>
             <p style={{ fontFamily: 'var(--font-body)', color: 'var(--color-text-muted, #9a8a78)', fontSize: '1.1rem', maxWidth: 480, margin: '0 auto', lineHeight: 1.7 }}>
               {t.catalog.moreText.split('\n').map((l: string, i: number) => <span key={i}>{l}{i === 0 && <br />}</span>)}
             </p>

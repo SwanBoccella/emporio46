@@ -5,6 +5,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { motion, useInView } from 'framer-motion'
 import { useApp } from '../../context/AppContext'
 import SectionBackdrop from '../ui/SectionBackdrop'
+import { REVEAL_VP } from '../../utils/reveal'
 
 gsap.registerPlugin(ScrollTrigger)
 
@@ -59,8 +60,8 @@ function WhyCard({ item, i, inView }: { item: { title: string; desc: string }; i
       className="why-card"
       style={{ height: '100%', padding: '3.5rem 2.8rem 3rem', background: pal.bg, position: 'relative', overflow: 'hidden', cursor: 'default' }}
       initial={{ opacity: 0, y: 60, scale: 0.96 }}
-      animate={inView ? { opacity: 1, y: 0, scale: 1 } : {}}
-      transition={{ duration: 0.85, delay: i * 0.12, ease: [0.16, 1, 0.3, 1] }}
+      whileInView={{ opacity: 1, y: 0, scale: 1 }} viewport={REVEAL_VP}
+      transition={{ duration: 1.36, delay: i * 0.12, ease: [0.16, 1, 0.3, 1] }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -71,8 +72,8 @@ function WhyCard({ item, i, inView }: { item: { title: string; desc: string }; i
       {/* Top accent bar sweep */}
       <motion.div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, background: pal.accent, transformOrigin: 'left' }}
         initial={{ scaleX: 0 }}
-        animate={inView ? { scaleX: 1 } : { scaleX: 0 }}
-        transition={{ duration: 0.7, delay: 0.3 + i * 0.1, ease: [0.16, 1, 0.3, 1] }} />
+        whileInView={{ scaleX: 1 }} viewport={REVEAL_VP}
+        transition={{ duration: 1.12, delay: 0.3 + i * 0.1, ease: [0.16, 1, 0.3, 1] }} />
 
       {/* Large watermark number */}
       <motion.div style={{ position: 'absolute', bottom: '1.5rem', right: '2rem', fontFamily: 'var(--font-display)', fontSize: '6rem', fontWeight: 700, color: pal.numColor, lineHeight: 1, userSelect: 'none' }}
@@ -128,14 +129,14 @@ export default function WhySection() {
 
       <div style={{ maxWidth: '100%', marginBottom: '7rem', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <motion.p className="section-label" style={{ marginBottom: '1.5rem' }}
-          initial={{ opacity: 0, y: 16 }} animate={inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}>
+          initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={REVEAL_VP}
+          transition={{ duration: 1.12, ease: [0.16, 1, 0.3, 1] }}>
           {t.why.label}
         </motion.p>
         <div className="gold-rule" style={{ marginBottom: '2rem' }} />
         <motion.h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.2rem,5vw,4rem)', fontWeight: 400, color: 'var(--color-text, #f5ede0)', lineHeight: 1.05 }}
-          initial={{ opacity: 0, y: 24 }} animate={inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.8, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}>
+          initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={REVEAL_VP}
+          transition={{ duration: 1.28, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}>
           {t.why.title}
         </motion.h2>
       </div>

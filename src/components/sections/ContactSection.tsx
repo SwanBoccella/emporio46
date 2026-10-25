@@ -4,6 +4,7 @@ import { motion, useInView, AnimatePresence } from 'framer-motion'
 import { useApp } from '../../context/AppContext'
 import SectionBackdrop from '../ui/SectionBackdrop'
 import { waBookLink, waSearchLink, waEstimateLink } from '../../utils/whatsapp'
+import { REVEAL_VP } from '../../utils/reveal'
 
 const DAYS_IT = ['Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato']
 const DAYS_EN = ['Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -357,8 +358,8 @@ export default function ContactSection() {
             className="section-label"
             style={{ marginBottom: '1.2rem' }}
             initial={{ opacity: 0, y: 16 }}
-            animate={inView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.7 }}
+            whileInView={{ opacity: 1, y: 0 }} viewport={REVEAL_VP}
+            transition={{ duration: 1.12 }}
           >
             {t.contact.label}
           </motion.p>
@@ -373,8 +374,8 @@ export default function ContactSection() {
               marginBottom: '1rem',
             }}
             initial={{ opacity: 0, y: 20 }}
-            animate={inView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.7, delay: 0.1 }}
+            whileInView={{ opacity: 1, y: 0 }} viewport={REVEAL_VP}
+            transition={{ duration: 1.12, delay: 0.1 }}
           >
             {t.contact.title}
           </motion.h2>
@@ -388,8 +389,8 @@ export default function ContactSection() {
               lineHeight: 1.75,
             }}
             initial={{ opacity: 0, y: 20 }}
-            animate={inView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.7, delay: 0.2 }}
+            whileInView={{ opacity: 1, y: 0 }} viewport={REVEAL_VP}
+            transition={{ duration: 1.12, delay: 0.2 }}
           >
             {t.contact.lead}
           </motion.p>
@@ -398,8 +399,8 @@ export default function ContactSection() {
         {/* Tabs */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
-          animate={inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.7, delay: 0.3 }}
+          whileInView={{ opacity: 1, y: 0 }} viewport={REVEAL_VP}
+          transition={{ duration: 1.12, delay: 0.3 }}
           style={{
             background: 'var(--color-bg-card, #1c1510)',
             border: '2px solid var(--color-text)',

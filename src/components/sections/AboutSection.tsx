@@ -5,6 +5,7 @@ import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { useApp } from '../../context/AppContext'
 import SectionBackdrop from '../ui/SectionBackdrop'
+import { REVEAL_VP } from '../../utils/reveal'
 
 gsap.registerPlugin(ScrollTrigger)
 
@@ -64,18 +65,6 @@ function TiltImage({ src, alt, sepia = 0.25, brightness = 0.82, opacity = 1 }: {
   )
 }
 
-function AboutPlaceholder() {
-  return (
-    <div style={{
-      position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'radial-gradient(ellipse at 50% 38%, rgba(var(--color-primary-rgb), 0.16), transparent 70%), var(--color-bg-card, #fbf4e6)',
-      border: '1px solid rgba(var(--color-primary-rgb), 0.2)',
-    }}>
-      <span style={{ fontFamily: 'var(--font-display)', fontStyle: 'italic', fontSize: 'clamp(7rem, 16vw, 13rem)', lineHeight: 1, color: 'var(--color-primary-text, var(--color-primary))', opacity: 0.9 }}>46</span>
-    </div>
-  )
-}
-
 export default function AboutSection() {
   const { t, lang, settings, settingsEn } = useApp()
   // Statistiche: mostrate solo se valorizzate dall'admin
@@ -107,14 +96,15 @@ export default function AboutSection() {
       <div className="about-grid" style={{ padding: '10rem clamp(1.5rem,7vw,8rem)' }}>
         {/* Image side */}
         <motion.div style={{ position: 'relative', height: '100%', minHeight: 520 }}
-          initial={{ opacity: 0, x: -50 }} animate={inView ? { opacity: 1, x: 0 } : {}}
-          transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1] }}>
+          initial={{ opacity: 0, x: -50 }} whileInView={{ opacity: 1, x: 0 }} viewport={REVEAL_VP}
+          transition={{ duration: 1.76, ease: [0.16, 1, 0.3, 1] }}>
 
           {/* Wrapper che occupa tutta l'altezza della colonna — position absolute fill */}
           <div ref={imgRef} style={{ position: 'absolute', inset: 0 }}>
-            {settings.aboutImageUrl
-              ? <TiltImage src={settings.aboutImageUrl} alt={settings.siteName || 'Emporio 46'} sepia={settings.aboutImageSepia ?? 0.25} brightness={settings.aboutImageBrightness ?? 0.82} opacity={settings.aboutImageOpacity ?? 1} />
-              : <AboutPlaceholder />}
+            {/* Senza foto caricata dall'admin si usa la foto di copertina del titolo (niente riquadro vuoto) */}
+            {(
+              <TiltImage src={settings.aboutImageUrl || '/bg/hero-foto.jpg'} alt={settings.siteName || 'Emporio 46'} sepia={settings.aboutImageSepia ?? 0.25} brightness={settings.aboutImageBrightness ?? 0.82} opacity={settings.aboutImageOpacity ?? 1} />
+            )}
 
             {/* Quote sovrapposta in basso sull'immagine */}
             <motion.div style={{
@@ -122,8 +112,8 @@ export default function AboutSection() {
                 padding: '1.6rem 2rem 1.8rem',
                 background: 'linear-gradient(to top, rgba(var(--color-bg-rgb), 0.92) 0%, rgba(var(--color-bg-rgb), 0.7) 60%, transparent 100%)',
               }}
-              initial={{ opacity: 0, y: 20 }} animate={inView ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.8, delay: 0.55, ease: [0.16, 1, 0.3, 1] }}>
+              initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={REVEAL_VP}
+              transition={{ duration: 1.28, delay: 0.55, ease: [0.16, 1, 0.3, 1] }}>
               <div style={{ width: 28, height: 1, background: 'var(--color-primary)', marginBottom: '0.85rem', opacity: 0.7 }} />
               <p style={{ fontFamily: 'var(--font-display)', fontStyle: 'italic', fontSize: '1rem', color: 'var(--color-primary-light)', lineHeight: 1.6, margin: 0 }}>&#8220;{lang === 'en' ? (settingsEn.aboutQuote || t.about.quote) : (settings.aboutQuote || t.about.quote)}&#8221;</p>
               <cite style={{ display: 'block', marginTop: '0.7rem', fontFamily: 'var(--font-label)', fontSize: '0.66rem', letterSpacing: '0.35em', textTransform: 'uppercase', color: 'var(--color-primary-text, var(--color-primary))', fontStyle: 'normal' }}>— {settings.siteName || 'Emporio 46'}</cite>
@@ -132,7 +122,7 @@ export default function AboutSection() {
 
           {/* Year marker */}
           <motion.div style={{ position: 'absolute', top: '2.5rem', left: '-1.5rem' }}
-            initial={{ opacity: 0 }} animate={inView ? { opacity: 1 } : {}} transition={{ delay: 0.7 }}>
+            initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={REVEAL_VP} transition={{ delay: 0.7 }}>
             <span style={{ fontFamily: 'var(--font-label)', fontSize: '0.66rem', letterSpacing: '0.4em', color: 'var(--color-text-muted)', textTransform: 'uppercase', writingMode: 'vertical-rl', display: 'block', transform: 'rotate(180deg)' }}>
               {lang === 'it' ? 'Firenze · Via G. Orsini 46/A' : 'Florence · Via G. Orsini 46/A'}
             </span>
@@ -140,8 +130,8 @@ export default function AboutSection() {
         </motion.div>
 
         {/* Text side */}
-        <motion.div initial={{ opacity: 0, x: 50 }} animate={inView ? { opacity: 1, x: 0 } : {}}
-          transition={{ duration: 1.1, delay: 0.12, ease: [0.16, 1, 0.3, 1] }}>
+        <motion.div initial={{ opacity: 0, x: 50 }} whileInView={{ opacity: 1, x: 0 }} viewport={REVEAL_VP}
+          transition={{ duration: 1.76, delay: 0.12, ease: [0.16, 1, 0.3, 1] }}>
           <p className="section-label" style={{ marginBottom: '1.5rem' }}>{t.about.label}</p>
           <div className="gold-rule" style={{ marginBottom: '2rem' }} />
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.2rem,4.8vw,3.8rem)', fontWeight: 400, color: 'var(--color-text, #f5ede0)', lineHeight: 1.05, marginBottom: '1.8rem' }}>
@@ -156,8 +146,8 @@ export default function AboutSection() {
             {vals.map((v, i) => (
               <motion.div key={i}
                 style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontFamily: 'var(--font-label)', fontSize: '0.66rem', letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--color-text-muted, #9a8a78)', padding: '0.6rem 0', borderBottom: '1px solid rgba(var(--color-primary-rgb), 0.06)', cursor: 'default' }}
-                initial={{ opacity: 0, x: 20 }} animate={inView ? { opacity: 1, x: 0 } : {}}
-                transition={{ duration: 0.6, delay: 0.4 + i * 0.08 }}
+                initial={{ opacity: 0, x: 20 }} whileInView={{ opacity: 1, x: 0 }} viewport={REVEAL_VP}
+                transition={{ duration: 0.96, delay: 0.4 + i * 0.08 }}
                 whileHover={{ color: 'var(--color-text, #f5ede0)', x: 4 }}>
                 <motion.div style={{ width: 4, height: 4, background: 'var(--color-primary)', flexShrink: 0 }}
                   animate={{ rotate: [0, 45, 90, 45, 0] }} transition={{ duration: 4, delay: i * 0.5, repeat: Infinity, ease: 'easeInOut' }} />
@@ -170,8 +160,8 @@ export default function AboutSection() {
           {statList.length > 0 && <div style={{ display: 'flex', gap: '3rem', borderTop: '1px solid rgba(var(--color-primary-rgb), 0.08)', paddingTop: '2.2rem', flexWrap: 'wrap' }}>
             {statList.map(([n, suf, l], si) => (
               <motion.div key={l} style={{ textAlign: 'left' }}
-                initial={{ opacity: 0, y: 16 }} animate={inView ? { opacity: 1, y: 0 } : {}}
-                transition={{ duration: 0.6, delay: 0.65 + si * 0.1 }}>
+                initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={REVEAL_VP}
+                transition={{ duration: 0.96, delay: 0.65 + si * 0.1 }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: '2.6rem', color: 'var(--color-primary-text, var(--color-primary))', lineHeight: 1, fontWeight: 400 }}>
                   <Counter target={parseFloat(n)} suffix={suf} />
                 </div>

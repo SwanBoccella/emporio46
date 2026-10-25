@@ -1,14 +1,31 @@
 // @ts-nocheck
-import React, { useRef } from 'react'
+import React, { useEffect, useRef } from 'react'
 import { motion, useInView } from 'framer-motion'
 import { useApp } from '../../context/AppContext'
 import { safeHref } from '../../utils/safeUrl'
 import SectionBackdrop from '../ui/SectionBackdrop'
+import { REVEAL_VP } from '../../utils/reveal'
 
 export default function FooterSection({ onOpenLegal }: { onOpenLegal?: (tab: string) => void }) {
   const { t, lang, settings, settingsEn, reviews, isAdmin } = useApp()
   const ref = useRef<HTMLElement>(null)
   const inView = useInView(ref, { once: true, amount: 0.15 })
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const reduceMotion = typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
+  // Il video del footer parte solo quando il footer è davvero visibile e si ferma quando esce dallo schermo (batteria, dati, fluidità)
+  useEffect(() => {
+    const v = videoRef.current
+    const host = ref.current
+    if (!v || !host || reduceMotion) return
+    v.muted = true
+    const io = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) v.play().catch(() => {})
+      else v.pause()
+    }, { threshold: 0.05 })
+    io.observe(host)
+    return () => io.disconnect()
+  }, [reduceMotion])
 
   const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -38,8 +55,24 @@ export default function FooterSection({ onOpenLegal }: { onOpenLegal?: (tab: str
       {/* Sfondo: immagine e parametri da admin → Sfondi & Mappa */}
       <SectionBackdrop slot="footer" scale={1.06} />
 
-      {/* Velo leggero: l'immagine resta visibile attorno al pannello. La leggibilità non dipende dall'immagine: il testo sta nel pannello opaco qui sotto */}
-      <div aria-hidden="true" style={{ position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none', background: 'linear-gradient(to bottom, rgba(var(--color-bg-rgb), 0.45) 0%, rgba(var(--color-bg-rgb), 0.6) 100%)' }} />
+      {/* Video di sfondo: copre l'intero footer, a ciclo continuo (con "riduci animazioni" resta solo il fotogramma) */}
+      <div aria-hidden="true" style={{ position: 'absolute', inset: 0, zIndex: 0, overflow: 'hidden', pointerEvents: 'none', background: '#0b0805' }}>
+        {reduceMotion ? (
+          <img src="/bg/footer-video-poster.jpg" alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        ) : (
+          <video
+            ref={videoRef}
+            src="/bg/footer-video.mp4"
+            poster="/bg/footer-video-poster.jpg"
+            muted loop playsInline preload="metadata"
+            disablePictureInPicture
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        )}
+      </div>
+
+      {/* Velo leggero: la leggibilità non dipende dal video, il testo sta nel pannello opaco qui sotto */}
+      <div aria-hidden="true" style={{ position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none', background: 'linear-gradient(to bottom, rgba(8,5,3,0.35) 0%, rgba(8,5,3,0.15) 50%, rgba(8,5,3,0.4) 100%)' }} />
 
       {/* Gold bottom glow */}
       <div style={{ position: 'absolute', inset: 0, zIndex: 2, background: 'radial-gradient(ellipse 80% 45% at 50% 105%, rgba(150,90,15,0.2) 0%, transparent 65%)' }} />
@@ -60,8 +93,8 @@ export default function FooterSection({ onOpenLegal }: { onOpenLegal?: (tab: str
           className="divider-line"
           style={{ marginBottom: '5rem' }}
           initial={{ opacity: 0, y: 20 }}
-          animate={inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.9, ease }}
+          whileInView={{ opacity: 1, y: 0 }} viewport={REVEAL_VP}
+          transition={{ duration: 1.44, ease }}
         >
           <span style={{ fontFamily: 'var(--font-label)', fontSize: 'clamp(0.74rem, 2.9vw, 0.92rem)', fontWeight: 600, letterSpacing: '0.16em', color: 'var(--color-primary-text, var(--color-primary))', textTransform: 'uppercase', whiteSpace: 'normal', textAlign: 'center', lineHeight: 1.5 }}>
             {lang === 'it' ? 'Firenze · Arredi vintage e bijoux' : 'Florence · Vintage furniture & jewellery'}
@@ -72,7 +105,7 @@ export default function FooterSection({ onOpenLegal }: { onOpenLegal?: (tab: str
         <div className="footer-grid" style={{ marginBottom: '5rem' }}>
 
           {/* Brand */}
-          <motion.div initial={{ opacity: 0, y: 28 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.9, delay: 0.08, ease }}>
+          <motion.div initial={{ opacity: 0, y: 28 }} whileInView={{ opacity: 1, y: 0 }} viewport={REVEAL_VP} transition={{ duration: 1.44, delay: 0.08, ease }}>
             <button onClick={() => scrollTo('hero')} style={{ borderRadius: 999, fontFamily: 'var(--font-label)', fontSize: '1.6rem', fontWeight: 500, letterSpacing: '0.14em', color: 'var(--color-text)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: '1.2rem', display: 'block', textAlign: 'left' }}>
               {(settings.siteName || 'Emporio 46').split(' ').map((w: string, i: number) => (
                 <span key={i}><span style={{ color: 'var(--color-primary-text, var(--color-primary))' }}>{w.charAt(0).toUpperCase()}</span>{w.slice(1).toUpperCase()}{' '}</span>
@@ -119,7 +152,7 @@ export default function FooterSection({ onOpenLegal }: { onOpenLegal?: (tab: str
           </motion.div>
 
           {/* Navigation */}
-          <motion.div initial={{ opacity: 0, y: 28 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.9, delay: 0.15, ease }}>
+          <motion.div initial={{ opacity: 0, y: 28 }} whileInView={{ opacity: 1, y: 0 }} viewport={REVEAL_VP} transition={{ duration: 1.44, delay: 0.15, ease }}>
             <p style={{ fontFamily: 'var(--font-label)', fontSize: '1rem', fontWeight: 600, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--color-primary-text, var(--color-primary))', marginBottom: '1.4rem' }}>
               {lang === 'it' ? 'Navigazione' : 'Navigation'}
             </p>
@@ -138,7 +171,7 @@ export default function FooterSection({ onOpenLegal }: { onOpenLegal?: (tab: str
           </motion.div>
 
           {/* Contacts */}
-          <motion.div initial={{ opacity: 0, y: 28 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.9, delay: 0.29, ease }}>
+          <motion.div initial={{ opacity: 0, y: 28 }} whileInView={{ opacity: 1, y: 0 }} viewport={REVEAL_VP} transition={{ duration: 1.44, delay: 0.29, ease }}>
             <p style={{ fontFamily: 'var(--font-label)', fontSize: '1rem', fontWeight: 600, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--color-primary-text, var(--color-primary))', marginBottom: '1.4rem' }}>
               {lang === 'it' ? 'Contatti' : 'Contacts'}
             </p>
@@ -166,7 +199,7 @@ export default function FooterSection({ onOpenLegal }: { onOpenLegal?: (tab: str
           const shown = isAdmin ? slots : filled
           return (
             <motion.div
-              initial={{ opacity: 0, y: 20 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.9, delay: 0.32, ease }}
+              initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={REVEAL_VP} transition={{ duration: 1.44, delay: 0.32, ease }}
               style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '3.2rem' }}
             >
               <p style={{ fontFamily: 'var(--font-label)', fontSize: '1rem', fontWeight: 600, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--color-primary-text, var(--color-primary))', marginBottom: '1.4rem', textAlign: 'center' }}>
@@ -195,8 +228,8 @@ export default function FooterSection({ onOpenLegal }: { onOpenLegal?: (tab: str
         {/* Bottom bar */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
-          animate={inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.9, delay: 0.38, ease }}
+          whileInView={{ opacity: 1, y: 0 }} viewport={REVEAL_VP}
+          transition={{ duration: 1.44, delay: 0.38, ease }}
           style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}
         >
           <p style={{ fontFamily: 'var(--font-label)', fontSize: '0.92rem', fontWeight: 500, letterSpacing: '0.06em', color: 'var(--color-text)', textTransform: 'uppercase', lineHeight: 1.6 }}>

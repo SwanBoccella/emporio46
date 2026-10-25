@@ -4,6 +4,7 @@ import { motion, useInView } from 'framer-motion'
 import { useApp, buildMapsEmbed } from '../../context/AppContext'
 import SectionBackdrop from '../ui/SectionBackdrop'
 import { safeHref } from '../../utils/safeUrl'
+import { REVEAL_VP } from '../../utils/reveal'
 
 export default function LocationSection() {
   const { t, lang, setContactTab, settings, settingsEn } = useApp()
@@ -53,8 +54,8 @@ export default function LocationSection() {
           className="section-label"
           style={{ marginBottom: '1.2rem' }}
           initial={{ opacity: 0, y: 16 }}
-          animate={inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.7 }}
+          whileInView={{ opacity: 1, y: 0 }} viewport={REVEAL_VP}
+          transition={{ duration: 1.12 }}
         >
           {t.location.label}
         </motion.p>
@@ -68,8 +69,8 @@ export default function LocationSection() {
             lineHeight: 1.2,
           }}
           initial={{ opacity: 0, y: 20 }}
-          animate={inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.7, delay: 0.1 }}
+          whileInView={{ opacity: 1, y: 0 }} viewport={REVEAL_VP}
+          transition={{ duration: 1.12, delay: 0.1 }}
         >
           {t.location.title}
         </motion.h2>
@@ -89,8 +90,8 @@ export default function LocationSection() {
         {/* Info panel */}
         <motion.div
           initial={{ opacity: 0, x: -30 }}
-          animate={inView ? { opacity: 1, x: 0 } : {}}
-          transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+          whileInView={{ opacity: 1, x: 0 }} viewport={REVEAL_VP}
+          transition={{ duration: 1.28, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
           style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem', height: '100%' }}
         >
           {/* Address */}
@@ -219,8 +220,8 @@ export default function LocationSection() {
         {/* Map */}
         <motion.div
           initial={{ opacity: 0, x: 30 }}
-          animate={inView ? { opacity: 1, x: 0 } : {}}
-          transition={{ duration: 0.8, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
+          whileInView={{ opacity: 1, x: 0 }} viewport={REVEAL_VP}
+          transition={{ duration: 1.28, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
           style={{
             border: '1px solid rgba(var(--color-primary-rgb), 0.15)',
             overflow: 'hidden',

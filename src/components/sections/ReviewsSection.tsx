@@ -3,6 +3,7 @@ import { motion, useInView, AnimatePresence, useMotionValue, useSpring, useTrans
 import { useApp } from '../../context/AppContext'
 import SectionBackdrop from '../ui/SectionBackdrop'
 import { deriveTheme } from '../../utils/themeColors'
+import { REVEAL_VP } from '../../utils/reveal'
 
 function Stars({ n }: { n: number }) {
   return (
@@ -134,27 +135,27 @@ export default function ReviewsSection() {
           padding: 'clamp(2rem,4vw,3rem) clamp(1.5rem,5vw,3rem)',
         }}>
           <motion.p className="section-label" style={{ marginBottom: '1.2rem', justifyContent: 'center' }}
-            initial={{ opacity: 0, y: 16 }} animate={inView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}>
+            initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={REVEAL_VP}
+            transition={{ duration: 1.12, ease: [0.16, 1, 0.3, 1] }}>
             {t.reviews.label}
           </motion.p>
           <div className="gold-rule" style={{ margin: '0 auto 1.5rem' }} />
           <motion.h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem,4.5vw,3.5rem)', fontWeight: 400, color: textMain, lineHeight: 1.1, marginBottom: '1rem' }}
-            initial={{ opacity: 0, y: 20 }} animate={inView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.7, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}>
+            initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={REVEAL_VP}
+            transition={{ duration: 1.12, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}>
             {t.reviews.title}
           </motion.h2>
           <motion.p style={{ fontFamily: 'var(--font-body)', fontSize: 'clamp(1rem,1.8vw,1.15rem)', color: textMuted, maxWidth: 500, margin: '0 auto', lineHeight: 1.75 }}
-            initial={{ opacity: 0, y: 20 }} animate={inView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.7, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}>
+            initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={REVEAL_VP}
+            transition={{ duration: 1.12, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}>
             {t.reviews.lead}
           </motion.p>
         </div>
 
         {/* Main layout */}
         <motion.div style={{ maxWidth: 1100, margin: '0 auto' }}
-          initial={{ opacity: 0, y: 30 }} animate={inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.8, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}>
+          initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={REVEAL_VP}
+          transition={{ duration: 1.28, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.6fr) minmax(0,1fr)', gap: '1.6rem', alignItems: 'stretch' }}>
             {/* Featured */}
