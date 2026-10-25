@@ -412,18 +412,45 @@
 /* ─── Footer grid ─── */
 .footer-grid {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr;
+  /* 3 riquadri (brand, navigazione, contatti) di larghezza uguale: niente colonna vuota a destra */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 3rem;
+  align-items: stretch;
 }
 @media (max-width: 900px) {
   .footer-grid {
-    grid-template-columns: 1fr 1fr !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  /* il terzo riquadro occupa tutta la riga, così le due righe restano simmetriche */
+  .footer-grid > *:nth-child(3) {
+    grid-column: 1 / -1;
   }
 }
 @media (max-width: 580px) {
   .footer-grid {
     grid-template-columns: 1fr !important;
   }
+}
+
+/* ─── Footer bottom bar ─── */
+.footer-bottom {
+  display: grid;
+  /* sinistra | centro | destra: le due colonne laterali hanno la stessa larghezza, il centro resta al centro */
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 1rem 1.5rem;
+}
+.footer-bottom-left { text-align: left; }
+.footer-bottom-center { text-align: center; }
+.footer-bottom-right { justify-content: flex-end; }
+@media (max-width: 900px) {
+  .footer-bottom {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+  .footer-bottom-left,
+  .footer-bottom-center { text-align: center; }
+  .footer-bottom-right { justify-content: center; }
 }
 
 /* ─── Reviews responsive ─── */

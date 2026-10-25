@@ -4,7 +4,7 @@ import { motion, useInView } from 'framer-motion'
 import { useApp } from '../../context/AppContext'
 import { safeHref } from '../../utils/safeUrl'
 import SectionBackdrop from '../ui/SectionBackdrop'
-import { REVEAL_VP } from '../../utils/reveal'
+import { REVEAL_VP, REVEAL_VP_END } from '../../utils/reveal'
 import { footerGlassStyle } from '../../utils/footerGlass'
 
 export default function FooterSection({ onOpenLegal }: { onOpenLegal?: (tab: string) => void }) {
@@ -169,7 +169,7 @@ export default function FooterSection({ onOpenLegal }: { onOpenLegal?: (tab: str
           const shown = isAdmin ? slots : filled
           return (
             <motion.div
-              initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={REVEAL_VP} transition={{ duration: 1.44, delay: 0.32, ease }}
+              initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={REVEAL_VP_END} transition={{ duration: 1.44, delay: 0.32, ease }}
               style={{ ...glass, display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '1.5rem' }}
             >
               <p style={{ fontFamily: 'var(--font-label)', fontSize: '1rem', fontWeight: 600, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--color-primary-text, var(--color-primary))', marginBottom: '1.4rem', textAlign: 'center' }}>
@@ -193,28 +193,22 @@ export default function FooterSection({ onOpenLegal }: { onOpenLegal?: (tab: str
         })()}
 
 
-        {/* Bottom bar */}
+        {/* Bottom bar: 3 zone simmetriche (copyright · credit · link legali), centrate su una colonna in mobile */}
         <motion.div
+          className="footer-bottom"
           initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }} viewport={REVEAL_VP}
+          whileInView={{ opacity: 1, y: 0 }} viewport={REVEAL_VP_END}
           transition={{ duration: 1.44, delay: 0.38, ease }}
-          style={{ ...glass, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}
+          style={{ ...glass, padding: 'clamp(1rem,2.5vw,1.4rem) clamp(1.3rem,3.5vw,2.2rem)' }}
         >
-          <p style={{ fontFamily: 'var(--font-label)', fontSize: '0.92rem', fontWeight: 500, letterSpacing: '0.06em', color: 'var(--color-text)', textTransform: 'uppercase', lineHeight: 1.6 }}>
+          <p className="footer-bottom-left" style={{ fontFamily: 'var(--font-label)', fontSize: '0.92rem', fontWeight: 500, letterSpacing: '0.06em', color: 'var(--color-text)', textTransform: 'uppercase', lineHeight: 1.6, margin: 0 }}>
             {settings.footerRights}{lang === 'it' && settings.pivaText ? ` · ${settings.pivaText}` : ''}
           </p>
-          {settings.footerDesign && (
-            <p style={{ fontFamily: 'var(--font-label)', fontSize: '0.92rem', fontWeight: 500, letterSpacing: '0.06em', color: 'var(--color-text-soft, var(--color-text))', textTransform: 'uppercase' }}>
-              {(settings.footerDesign || '').replace(/err0r_hb/gi, 'Swan Boccella')}
-            </p>
-          )}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-            <div style={{ width: 36, height: 1, background: 'rgba(var(--color-primary-rgb), 0.15)' }} />
-            <div style={{ width: 4, height: 4, background: 'var(--color-primary)', transform: 'rotate(45deg)', opacity: 0.35 }} />
-            <div style={{ width: 36, height: 1, background: 'rgba(var(--color-primary-rgb), 0.15)' }} />
-          </div>
+          <p className="footer-bottom-center" style={{ fontFamily: 'var(--font-label)', fontSize: '0.92rem', fontWeight: 500, letterSpacing: '0.06em', color: 'var(--color-text-soft, var(--color-text))', textTransform: 'uppercase', lineHeight: 1.6, margin: 0 }}>
+            {(settings.footerDesign || '').replace(/err0r_hb/gi, 'Swan Boccella')}
+          </p>
           {/* Legal links */}
-          <div style={{ display: 'flex', gap: '0.4rem 1.4rem', flexWrap: 'wrap', justifyContent: 'flex-start' }}>
+          <div className="footer-bottom-right" style={{ display: 'flex', gap: '0.4rem 1.4rem', flexWrap: 'wrap' }}>
             {[
               { tab: 'termini', labelIt: 'Termini di Servizio', labelEn: 'Terms' },
               { tab: 'privacy', labelIt: 'Privacy Policy', labelEn: 'Privacy' },
