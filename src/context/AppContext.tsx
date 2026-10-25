@@ -586,10 +586,10 @@ function load<T>(key: string, fallback: T): T {
 }
 
 // ─── GitHub Gist sync ─────────────────────────────────────────────────────────
-// Legge le variabili d'ambiente Vite (impostate su Netlify come env vars)
+// Legge le variabili d'ambiente Vite (impostate come variabili di build su Cloudflare)
 const GIST_ID = import.meta.env.VITE_GIST_ID as string | undefined
 const GIST_FILE = 'mnt_data.json'
-export const SYNC_STATUS = { canRead: true }   // i contenuti arrivano dal server (Netlify Database/Blobs); il Gist è solo fallback
+export const SYNC_STATUS = { canRead: true }   // i contenuti arrivano dal server (Cloudflare D1); il Gist è solo fallback
 
 // Chiavi che NON devono mai finire nel Gist (leggibile pubblicamente)
 const PRIVATE_KEYS = ['adminPassword'] as const
@@ -649,10 +649,10 @@ function parseRemote(content: string): RemoteData | null {
   } catch { return null }
 }
 
-// 1) Server: Netlify Database → Netlify Blobs (→ Gist lato server se ancora vuoti)
+// 1) Server: Cloudflare D1 (→ Gist lato server se ancora vuoto)
 async function fetchServerData(): Promise<RemoteData | null> {
   try {
-    const res = await fetch('/.netlify/functions/site-data', { cache: 'no-cache' })
+    const res = await fetch('/api/site-data', { cache: 'no-cache' })
     if (!res.ok || !(res.headers.get('content-type') || '').includes('json')) return null
     return parseRemote(await res.text())
   } catch { return null }
@@ -850,7 +850,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const doSync = useCallback(async () => {
     if (!dirtyRef.current) return
     if (!getAdminToken()) {
-      if (import.meta.env.DEV) { dirtyRef.current = false; setGistSyncStatus('local'); setGistSyncMessage('Modalità sviluppo: salvato solo in locale (le Function Netlify non girano con npm run dev).'); return }
+      if (import.meta.env.DEV) { dirtyRef.current = false; setGistSyncStatus('local'); setGistSyncMessage('Modalità sviluppo: salvato solo in locale (il Worker Cloudflare non gira con npm run dev).'); return }
       setGistSyncStatus('auth'); setGistSyncMessage('Sessione scaduta: rifai il login. Le modifiche NON sono state salvate sul server.')
       return
     }

@@ -44,8 +44,8 @@ export function getGroqKey(): string {
   try { const k = (localStorage.getItem(LS_KEY) || '').trim(); if (k) return k } catch { /* noop */ }
   return devKey()
 }
-// In produzione la chiave sta su Netlify (GROQ_API_KEY) e passa dalla Function groq-proxy
-export const GROQ_PROXY = '/.netlify/functions/groq-proxy'
+// In produzione la chiave sta su Cloudflare (secret GROQ_API_KEY) e passa dal Worker /api/groq-proxy
+export const GROQ_PROXY = '/api/groq-proxy'
 export function setGroqKey(k: string) {
   try { const v = k.trim(); if (v) localStorage.setItem(LS_KEY, v); else localStorage.removeItem(LS_KEY) } catch { /* noop */ }
 }
@@ -95,7 +95,7 @@ async function requestOnce(model: string, o: ChatOpts, extra: Extra, budget: num
   const key = getGroqKey()
   const token = key ? '' : adminSessionToken()
   const viaProxy = !key && !!token
-  if (!key && !token) throw new GroqError('Chiave Groq mancante: imposta GROQ_API_KEY su Netlify (e accedi come admin) oppure inseriscila in Impostazioni → Chiave API Groq.', 401)
+  if (!key && !token) throw new GroqError('Chiave Groq mancante: imposta il secret GROQ_API_KEY su Cloudflare (e accedi come admin) oppure inseriscila in Impostazioni → Chiave API Groq.', 401)
 
   let lastErr: GroqError | null = null
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -113,9 +113,9 @@ async function requestOnce(model: string, o: ChatOpts, extra: Extra, budget: num
         try { const j = await res.json(); apiMsg = j?.error?.message || ''; code = j?.error?.code || '' } catch { /* noop */ }
         let msg = explain(res.status, apiMsg)
         if (viaProxy) { // errori del proxy (sessione scaduta, chiave server mancante, funzione non pubblicata)
-          if (res.status === 404 || res.status === 405) msg = 'Proxy AI non disponibile: la Netlify Function groq-proxy non è pubblicata. In locale usa VITE_GROQ_DEV_KEY in .env.local.'
+          if (res.status === 404 || res.status === 405) msg = 'Proxy AI non disponibile: il Worker Cloudflare non risponde su /api/groq-proxy (non pubblicato?). In locale usa VITE_GROQ_DEV_KEY in .env.local.'
           else if (code === 'session_expired') msg = 'Sessione admin scaduta: rifai il login.'
-          else if (code === 'not_configured') msg = apiMsg || 'GROQ_API_KEY mancante nelle variabili Netlify.'
+          else if (code === 'not_configured') msg = apiMsg || 'GROQ_API_KEY mancante nei secret Cloudflare.'
         }
         const err = new GroqError(msg, res.status, modelGone(res.status, code, apiMsg))
         err.raw = apiMsg

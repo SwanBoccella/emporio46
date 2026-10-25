@@ -1,0 +1,31 @@
+{
+  // Emporio 46 — Cloudflare Workers (sito statico + API) con D1 (contenuti) e R2 (file caricati)
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "emporio46",
+  "main": "worker/index.mjs",
+  "compatibility_date": "2025-09-01",
+
+  // Il sito React compilato (npm run build → dist/). Le route /api/*, /media/*, /sitemap.xml e /robots.txt
+  // passano prima dal Worker; tutto il resto è servito direttamente dagli Assets, con fallback SPA su index.html.
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/media/*", "/sitemap.xml", "/robots.txt"]
+  },
+
+  // Database dei contenuti. Se database_id manca, `wrangler deploy` crea il database da solo (provisioning automatico).
+  // Se preferisci crearlo a mano: npx wrangler d1 create emporio46-db → incolla qui "database_id".
+  "d1_databases": [
+    { "binding": "DB", "database_name": "emporio46-db", "migrations_dir": "migrations" }
+  ],
+
+  // File caricati dal pannello admin (immagini, video di sfondo, modello 3D). Creato automaticamente al deploy.
+  "r2_buckets": [
+    { "binding": "FILES", "bucket_name": "emporio46-files" }
+  ],
+
+  // Non cancella le variabili/secret impostati dalla dashboard a ogni deploy
+  "keep_vars": true,
+  "observability": { "enabled": true }
+}

@@ -159,7 +159,7 @@ function GroqKeyPanel({ onToast }: { onToast: (msg: string) => void }) {
     <div style={{ ...cardStyle, border: '1px solid rgba(111,207,151,0.2)' }}>
       <p style={{ ...labelStyle, color: '#6fcf97', marginBottom: '0.5rem' }}>🤖 CHIAVE API GROQ (AI)</p>
       <p style={{ fontFamily: 'Cormorant Garamond, serif', color: '#9a8a78', fontSize: '0.85rem', marginBottom: '1rem' }}>
-        Crea una chiave gratuita su <strong style={{ color: '#c9a84c' }}>console.groq.com</strong> → API Keys → Create key. Se su Netlify è impostata <strong style={{ color: '#c9a84c' }}>GROQ_API_KEY</strong> (consigliato) non serve inserire nulla qui: l'AI funziona su ogni dispositivo dopo il login. Una chiave inserita qui vale solo in questo browser e ha la precedenza.
+        Crea una chiave gratuita su <strong style={{ color: '#c9a84c' }}>console.groq.com</strong> → API Keys → Create key. Se su Cloudflare è impostato il secret <strong style={{ color: '#c9a84c' }}>GROQ_API_KEY</strong> (consigliato) non serve inserire nulla qui: l'AI funziona su ogni dispositivo dopo il login. Una chiave inserita qui vale solo in questo browser e ha la precedenza.
       </p>
       <div style={{ display: 'flex', gap: 6, marginBottom: '0.5rem' }}>
         <input
@@ -725,14 +725,14 @@ function EmailJsTools({ local }: { local: SiteSettings }) {
       {!canWrite && !fromEnv && (
         <div style={{ ...box, background: 'rgba(235,87,87,0.06)', borderColor: 'rgba(235,87,87,0.3)' }}>
           <strong style={{ color: '#eb5757' }}>⚠ Sincronizzazione non attiva.</strong> Queste impostazioni vengono salvate solo in <em>questo browser</em>:
-          i tuoi clienti non le vedranno e i form continueranno ad aprire WhatsApp. Su Netlify (Site configuration → Environment variables) imposta le variabili
+          i tuoi clienti non le vedranno e i form continueranno ad aprire WhatsApp. Su Cloudflare (Workers → Settings → Build → Variables and secrets) imposta le variabili
           <code style={{ color: '#f5ede0' }}> VITE_EMAILJS_SERVICE</code>, <code style={{ color: '#f5ede0' }}>VITE_EMAILJS_PUBLIC_KEY</code>, <code style={{ color: '#f5ede0' }}>VITE_EMAILJS_TEMPLATE</code> (e opzionale <code style={{ color: '#f5ede0' }}>VITE_EMAILJS_TEMPLATE_CLIENT</code>) e rifai il deploy,
-          oppure fai il login admin dal sito pubblicato su Netlify (le Function Netlify non girano con npm run dev).
+          oppure fai il login admin dal sito pubblicato su Cloudflare (il Worker non gira con npm run dev: per provarlo in locale usa npm run preview:cf).
         </div>
       )}
       {canWrite && (
         <div style={{ ...box, background: 'rgba(111,207,151,0.05)', borderColor: 'rgba(111,207,151,0.2)' }}>
-          <strong style={{ color: '#6fcf97' }}>✓ Sincronizzazione attiva.</strong> Le modifiche vengono pubblicate sul server (Netlify Database + Blobs) entro ~2 secondi e raggiungono tutti i visitatori al prossimo caricamento della pagina.
+          <strong style={{ color: '#6fcf97' }}>✓ Sincronizzazione attiva.</strong> Le modifiche vengono pubblicate sul server (Cloudflare D1 + R2) entro ~2 secondi e raggiungono tutti i visitatori al prossimo caricamento della pagina.
         </div>
       )}
       {!canWrite && SYNC_STATUS.canRead && !fromEnv && (
@@ -1352,7 +1352,7 @@ Regole:
               <div style={{ ...cardStyle, background: 'rgba(111,207,151,0.05)', borderColor: 'rgba(111,207,151,0.2)' }}>
                 <p style={{ fontFamily: 'Cinzel, serif', fontSize: '0.46rem', letterSpacing: '0.15em', color: '#6fcf97', marginBottom: 6 }}>⚠ IMPORTANTE — ALLOWED ORIGINS</p>
                 <p style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '0.82rem', color: '#9a8a78', lineHeight: 1.6 }}>
-                  Aggiungi il dominio del sito (es. <em>nome-sito.netlify.app</em> e il dominio custom) in
+                  Aggiungi il dominio del sito (es. <em>nome-sito.workers.dev</em> e il dominio custom) in
                   EmailJS → Account → <strong style={{ color: '#f5ede0' }}>Allowed Origins</strong>, altrimenti le email non partono.
                 </p>
               </div>
@@ -2835,7 +2835,7 @@ function AdminLogin({ onLogin, onClose }: { onLogin: () => void; onClose: () => 
     const r = await adminLogin(pw)
     setBusy(false)
     if (r.ok) { onLogin(); return }
-    // Solo in sviluppo locale (npm run dev, senza Netlify Function) è ammesso l'accesso senza server
+    // Solo in sviluppo locale (npm run dev, senza il Worker Cloudflare) è ammesso l'accesso senza server
     if (import.meta.env.DEV && r.reason === 'unavailable' && adminPassword && pw === adminPassword) { onLogin(); return }
     setErrMsg(r.message)
   }
@@ -2911,7 +2911,7 @@ function makePoster(file: File): Promise<Blob | null> {
   })
 }
 
-// Video di sfondo di una zona: URL oppure upload (MP4/WebM fino a 36 MB) su Netlify Blobs, con poster automatico
+// Video di sfondo di una zona: URL oppure upload (MP4/WebM fino a 36 MB) su Cloudflare R2, con poster automatico
 function VideoField({ video, poster, onChange }: { video: string; poster: string; onChange: (patch: { video?: string; poster?: string }) => void }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
@@ -3782,7 +3782,7 @@ ${JSON.stringify({ label: itLabel, chapters: source })}`, 1200)
     // prova di lettura PRIMA di sostituire il modello attuale: se il file non è valido resta quello in uso
     const check = await validateGlb(f)
     if (!check.ok) { setMsg({ ok: false, text: check.error + ' Il modello attuale non è stato modificato.' }); setBusy(false); return }
-    // Pubblica il file sul server (Netlify Blobs): da quel momento lo vedono TUTTI i visitatori
+    // Pubblica il file sul server (Cloudflare R2): da quel momento lo vedono TUTTI i visitatori
     setMsg({ ok: true, text: 'Caricamento sul server in corso… non chiudere la pagina.' })
     const up = await adminUploadAsset(f, 'model/gltf-binary', f.name, (d, t) => setMsg({ ok: true, text: `Caricamento sul server… ${d}/${t}` }))
     if (up.ok) {
@@ -3937,8 +3937,8 @@ function PasswordAdmin() {
     <div style={{ maxWidth: 520 }}>
       <h3 style={{ ...sectionTitle, marginBottom: '0.5rem' }}>Password admin</h3>
       <p style={{ fontFamily: 'Cormorant Garamond, serif', color: '#9a8a78', fontSize: '0.88rem', marginBottom: '1.6rem', lineHeight: 1.55 }}>
-        Cambia qui la password del pannello. La nuova password viene salvata sul server in forma cifrata (non nel Gist e non nel sito) e sostituisce quella impostata su Netlify.
-        Se la dimentichi, su Netlify imposta <code>ADMIN_PASSWORD_FORCE_ENV=1</code> per tornare a <code>ADMIN_PASSWORD</code>.
+        Cambia qui la password del pannello. La nuova password viene salvata sul server in forma cifrata (non nel Gist e non nel sito) e sostituisce quella impostata su Cloudflare.
+        Se la dimentichi, su Cloudflare imposta <code>ADMIN_PASSWORD_FORCE_ENV=1</code> per tornare a <code>ADMIN_PASSWORD</code>.
       </p>
       <div style={cardStyle}>
         <label style={labelStyle}>Password attuale</label>
