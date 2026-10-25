@@ -31,7 +31,7 @@ export default async (req) => {
     try { v = process.env[n] || (typeof Netlify !== 'undefined' ? Netlify.env.get(n) : '') || '' } catch { /* noop */ }
     return String(v).trim().replace(/^["']+|["']+$/g, '').trim()
   }
-  const KEY = ['GROQ_API_KEY', 'GROQ_KEY', 'GROQ_API_TOKEN', 'GROQ_TOKEN'].map(readEnv).find(Boolean) || ''
+  const KEY = ['GROQ_API_KEY', 'GROQ_DEV_KEY', 'GROQ_KEY', 'GROQ_API_TOKEN', 'GROQ_TOKEN'].map(readEnv).find(Boolean) || ''
   if (!KEY) {
     const similar = Object.keys(process.env).filter(k => /groq|grok|gsk/i.test(k))
     const adminVisible = !!process.env.ADMIN_PASSWORD
