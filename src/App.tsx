@@ -92,12 +92,21 @@ export default function App() {
 
   // Apply dynamic font families from admin settings
   useEffect(() => {
-    const SERIF = ['Fraunces', 'Playfair Display', 'Cormorant Garamond', 'Cinzel', 'EB Garamond', 'Libre Baskerville', 'Lora', 'Merriweather', 'Source Serif 4']
-    const stack = (n: string) => `'${n}', ${SERIF.includes(n) ? 'Georgia, serif' : 'system-ui, sans-serif'}`
+    // Solo font davvero inclusi nel sito (src/main.tsx). Un nome salvato in passato nell'admin e non più incluso
+    // (es. Merriweather, Oswald…) non trova nessun file e il telefono ripiega su un carattere di sistema a caso:
+    // qui viene sostituito dal font predefinito invece di restare "senza font".
+    const SERIF = ['Fraunces', 'Playfair Display', 'Cormorant Garamond', 'Cinzel', 'EB Garamond', 'Libre Baskerville', 'Lora']
+    const SANS = ['Jost']
+    const pick = (n: string | undefined, fallback: string) => (n && (SERIF.includes(n) || SANS.includes(n)) ? n : fallback)
+    const stack = (n: string) => SERIF.includes(n)
+      ? `'${n}', Georgia, 'Times New Roman', serif`
+      : `'${n}', 'Helvetica Neue', Arial, sans-serif`
     const root = document.documentElement
-    root.style.setProperty('--font-display', stack(settings.fontDisplay || 'Fraunces'))
-    root.style.setProperty('--font-body', stack(settings.fontBody || 'Jost'))
-    root.style.setProperty('--font-label', stack(settings.fontLabel || settings.fontBody || 'Jost'))
+    const display = pick(settings.fontDisplay, 'Fraunces')
+    const body = pick(settings.fontBody, 'Jost')
+    root.style.setProperty('--font-display', stack(display))
+    root.style.setProperty('--font-body', stack(body))
+    root.style.setProperty('--font-label', stack(pick(settings.fontLabel, body)))
   }, [settings.fontDisplay, settings.fontBody, settings.fontLabel])
 
   // After loader disappears (2.4s), refresh ScrollTrigger so all

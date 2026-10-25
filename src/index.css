@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=Jost:ital,wght@0,300..600;1,300..500&family=Cinzel:wght@400;500;600&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&family=Playfair+Display:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -122,9 +121,9 @@
   /* ─── Section Label ─── */
   .section-label {
     font-family: var(--font-label);
-    font-size: 0.6rem;
+    font-size: 0.8rem;
     font-weight: 500;
-    letter-spacing: 0.55em;
+    letter-spacing: 0.3em;
     text-transform: uppercase;
     color: var(--color-primary-text, var(--color-primary));
     display: inline-flex;
@@ -313,8 +312,8 @@
     gap: 1.5rem;
     color: color-mix(in srgb, var(--color-text-muted) 30%, transparent);
     font-family: var(--font-label);
-    font-size: 0.55rem;
-    letter-spacing: 0.4em;
+    font-size: 0.78rem;
+    letter-spacing: 0.26em;
   }
   .divider-line::before, .divider-line::after {
     content: '';
@@ -545,8 +544,8 @@
   .btn-ghost {
     min-height: 48px;
     padding: 0.85rem 1.8rem;
-    font-size: 0.6rem;
-    letter-spacing: 0.2em;
+    font-size: 0.82rem;
+    letter-spacing: 0.14em;
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
   }
@@ -589,8 +588,8 @@
 .btn-gold, .btn-ghost {
   border-radius: 999px !important;
   border: 2px solid var(--ink) !important;
-  font-size: 0.74rem !important;
-  letter-spacing: 0.14em !important;
+  font-size: 0.86rem !important;
+  letter-spacing: 0.12em !important;
   font-weight: 500 !important;
   padding: 1rem 2.1rem !important;
   box-shadow: 4px 4px 0 var(--ink) !important;
@@ -605,8 +604,8 @@
 
 /* Etichette di sezione a bollino */
 .section-label {
-  letter-spacing: 0.2em !important;
-  font-size: 0.68rem !important;
+  letter-spacing: 0.16em !important;
+  font-size: 0.82rem !important;
   font-weight: 500 !important;
   padding: 0.42rem 1rem;
   border: 1.5px solid var(--color-primary);

@@ -1,16 +1,55 @@
 // @ts-nocheck
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useApp } from '../../context/AppContext'
 import { getLenis } from '../../hooks/useLenis'
 import { safeHref } from '../../utils/safeUrl'
 import SectionBackdrop from './SectionBackdrop'
+import { deriveTheme } from '../../utils/themeColors'
 
 export default function Navbar({ onOpenLegal, bannerActive }: { onOpenLegal?: (tab: string) => void; bannerActive?: boolean }) {
   const { t, lang, setLang, isAdmin, setContactTab, settings, translateSettingsToEn, isTranslatingEn, settingsEn, reviews } = useApp()
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const navTop = bannerActive ? 36 : 0
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  // Il pill (sfondo tema) si nasconde quando il menu è aperto: sopra al video scuro restano solo testi chiari
+  const pillOn = scrolled && !menuOpen
+  const reduceMotion = typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  // Il menu ha sempre sfondo scuro (video della candela), quindi ogni testo sta dentro una "pillola" opaca che garantisce il contrasto:
+  //  - tema scuro  → testo SCURO su pillola CHIARA
+  //  - tema chiaro → testo CHIARO su pillola SCURA
+  // Le variabili vengono ridefinite solo qui, il resto del sito non cambia.
+  const siteIsDark = deriveTheme(settings).isDark
+  const menuTheme: any = siteIsDark
+    ? {
+        '--color-text': '#1d120b',
+        '--color-text-soft': '#33231a',
+        '--color-text-muted': '#4a372b',
+        '--color-primary-text': 'color-mix(in srgb, var(--color-primary) 45%, #1a0d06)',
+        '--text-halo-rgb': '255, 255, 255',
+        '--menu-pill-bg': 'rgba(250, 242, 228, 0.94)',
+        '--menu-pill-border': 'rgba(29, 18, 11, 0.28)',
+        color: '#1d120b',
+      }
+    : {
+        '--color-text': '#fbf3e4',
+        '--color-text-soft': '#eadfca',
+        '--color-text-muted': '#d9ccb4',
+        '--color-primary-text': 'color-mix(in srgb, var(--color-primary) 38%, #ffe2a8)',
+        '--text-halo-rgb': '0, 0, 0',
+        '--menu-pill-bg': 'rgba(18, 11, 7, 0.88)',
+        '--menu-pill-border': 'rgba(251, 243, 228, 0.35)',
+        color: '#fbf3e4',
+      }
+  const menuPill: any = {
+    background: 'var(--menu-pill-bg)',
+    border: '1px solid var(--menu-pill-border)',
+    borderRadius: 999,
+    backdropFilter: 'blur(6px)',
+    WebkitBackdropFilter: 'blur(6px)',
+    textShadow: 'none',
+  }
 
   const handleLangToggle = () => {
     const next = lang === 'it' ? 'en' : 'it'
@@ -27,6 +66,14 @@ export default function Navbar({ onOpenLegal, bannerActive }: { onOpenLegal?: (t
     if (menuOpen) { root.dataset.menu = '1'; getLenis()?.stop() }
     else { delete root.dataset.menu; getLenis()?.start() }
     return () => { delete root.dataset.menu; getLenis()?.start() }
+  }, [menuOpen])
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const v = videoRef.current
+    if (!v) return
+    v.muted = true
+    v.play().catch(() => { /* risparmio dati / autoplay bloccato: resta il poster */ })
   }, [menuOpen])
 
   const goToBook = () => {
@@ -73,20 +120,21 @@ export default function Navbar({ onOpenLegal, bannerActive }: { onOpenLegal?: (t
           paddingLeft: 'clamp(1rem, 3vw, 2.2rem)',
           paddingRight: 'clamp(1rem, 3vw, 2.2rem)',
           textShadow: '0 0 10px rgba(var(--text-halo-rgb, 0,0,0), 0.45)',
+          ...(menuOpen ? menuTheme : {}),
         }}
         animate={{
-          background: scrolled ? 'color-mix(in srgb, var(--color-bg-card) 94%, transparent)' : 'transparent',
-          border: scrolled ? '2px solid var(--color-text)' : '2px solid transparent',
-          boxShadow: scrolled ? '4px 4px 0 var(--color-text)' : '0 0 0 transparent',
-          backdropFilter: scrolled ? 'blur(14px) saturate(1.4)' : 'blur(0px)',
+          background: menuOpen ? 'var(--menu-pill-bg)' : pillOn ? 'color-mix(in srgb, var(--color-bg-card) 94%, transparent)' : 'transparent',
+          border: menuOpen ? '2px solid var(--menu-pill-border)' : pillOn ? '2px solid var(--color-text)' : '2px solid transparent',
+          boxShadow: pillOn ? '4px 4px 0 var(--color-text)' : '0 0 0 transparent',
+          backdropFilter: pillOn ? 'blur(14px) saturate(1.4)' : 'blur(0px)',
         }}
         transition={{ duration: 0.45 }}
       >
         {/* Sfondo della barra: compare insieme al "pill" quando si scorre */}
         <div aria-hidden="true" style={{ position: 'absolute', inset: 0, borderRadius: 'inherit', overflow: 'hidden', pointerEvents: 'none', zIndex: -1 }}>
-          <SectionBackdrop slot="navbar" visible={scrolled} />
+          <SectionBackdrop slot="navbar" visible={pillOn} />
           {/* Velo del colore della card: la texture resta come venatura, ma il testo ha sempre contrasto (tema chiaro e scuro) */}
-          <div style={{ position: 'absolute', inset: 0, background: 'color-mix(in srgb, var(--color-bg-card) 86%, transparent)', opacity: scrolled ? 1 : 0, transition: 'opacity 0.45s' }} />
+          <div style={{ position: 'absolute', inset: 0, background: 'color-mix(in srgb, var(--color-bg-card) 86%, transparent)', opacity: pillOn ? 1 : 0, transition: 'opacity 0.45s' }} />
         </div>
         {/* Logo */}
         <button
@@ -225,22 +273,47 @@ export default function Navbar({ onOpenLegal, bannerActive }: { onOpenLegal?: (t
       <AnimatePresence>
         {menuOpen && (
           <motion.div
-            className="fixed inset-0 z-[999] flex flex-col items-center justify-center"
+            className="fixed inset-0 z-[999]"
             style={{
-              // Sfondo opaco, niente backdrop-filter né clip-path: si anima solo opacity/transform (GPU, 60fps)
-              background: 'var(--color-bg, #080604)',
-              overflowY: 'auto',
-              overscrollBehavior: 'contain',
+              background: '#0b0805',
               willChange: 'opacity, transform',
-              paddingTop: 'max(80px, env(safe-area-inset-top, 80px))',
-              paddingBottom: 'max(40px, env(safe-area-inset-bottom, 40px))',
-              gap: 0,
+              ...menuTheme,
+              textShadow: 'none',
             }}
             initial={{ opacity: 0, y: -14 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.26, ease: [0.32, 0.72, 0, 1] }}
           >
+            {/* Sfondo: video a ciclo continuo (solo poster se l'utente riduce le animazioni) */}
+            <div aria-hidden="true" style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+              {reduceMotion ? (
+                <img src="/bg/menu-candela-poster.jpg" alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <video
+                  ref={videoRef}
+                  src="/bg/menu-candela.mp4"
+                  poster="/bg/menu-candela-poster.jpg"
+                  autoPlay muted loop playsInline
+                  preload="auto"
+                  disablePictureInPicture
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              )}
+              {/* Velo leggero: il contrasto del testo è garantito dalle pillole, non dal video */}
+              <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(8,5,3,0.25) 0%, rgba(8,5,3,0.1) 45%, rgba(8,5,3,0.3) 100%)' }} />
+            </div>
+
+            {/* Contenuto scorrevole sopra al video */}
+            <div style={{
+              position: 'absolute', inset: 0,
+              overflowY: 'auto',
+              overscrollBehavior: 'contain',
+              display: 'flex', flexDirection: 'column', alignItems: 'center',
+              paddingTop: 'max(80px, env(safe-area-inset-top, 80px))',
+              paddingBottom: 'max(40px, env(safe-area-inset-bottom, 40px))',
+            }}>
+            <div style={{ margin: 'auto 0', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             {/* Decorative site name */}
             <div style={{
               fontFamily: 'var(--font-label)',
@@ -250,6 +323,8 @@ export default function Navbar({ onOpenLegal, bannerActive }: { onOpenLegal?: (t
               textTransform: 'uppercase',
               whiteSpace: 'nowrap',
               marginBottom: 'clamp(2rem, 6vh, 3.5rem)',
+              padding: '0.5rem 1.6rem',
+              ...menuPill,
             }}>
               {settings.siteName || 'Emporio 46'}
             </div>
@@ -265,12 +340,11 @@ export default function Navbar({ onOpenLegal, bannerActive }: { onOpenLegal?: (t
                     fontSize: 'clamp(1.8rem, 7vw, 2.8rem)',
                     color: 'var(--color-text, #f5ede0)',
                     transition: 'color 0.3s',
-                    background: 'none',
-                    border: 'none',
                     cursor: 'pointer',
-                    padding: '0.2rem 2rem',
+                    padding: '0.35rem 1.8rem',
                     lineHeight: 1.1,
                     touchAction: 'manipulation',
+                    ...menuPill,
                   }}
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -290,12 +364,11 @@ export default function Navbar({ onOpenLegal, bannerActive }: { onOpenLegal?: (t
                   fontStyle: 'italic',
                   fontSize: 'clamp(1.8rem, 7vw, 2.8rem)',
                   color: 'var(--color-primary-text, var(--color-primary))',
-                  background: 'none',
-                  border: 'none',
                   cursor: 'pointer',
-                  padding: '0.2rem 2rem',
+                  padding: '0.35rem 1.8rem',
                   lineHeight: 1.1,
                   touchAction: 'manipulation',
+                  ...menuPill,
                 }}
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -318,7 +391,8 @@ export default function Navbar({ onOpenLegal, bannerActive }: { onOpenLegal?: (t
                   color: 'var(--color-primary-text, var(--color-primary))',
                   border: '1.5px solid var(--color-primary-text, var(--color-primary))',
                   padding: '0.7rem 2.2rem',
-                  background: 'none',
+                  ...menuPill,
+                  border: '1.5px solid var(--color-primary-text, var(--color-primary))',
                   cursor: 'pointer',
                   touchAction: 'manipulation',
                   minHeight: 44,
@@ -339,10 +413,9 @@ export default function Navbar({ onOpenLegal, bannerActive }: { onOpenLegal?: (t
                   letterSpacing: '0.18em',
                   textTransform: 'uppercase',
                   color: 'var(--color-text-soft, var(--color-text))',
-                  background: 'none',
-                  border: 'none',
+                  ...menuPill,
                   cursor: 'pointer',
-                  padding: '0.4rem 1rem',
+                  padding: '0.4rem 1.2rem',
                   minHeight: 44,
                   touchAction: 'manipulation',
                 }}
@@ -361,7 +434,7 @@ export default function Navbar({ onOpenLegal, bannerActive }: { onOpenLegal?: (t
                 style={{ display: 'flex', gap: '1rem' }}
               >
                 <a href={safeHref(settings.instagram, 'https://www.instagram.com/emporio46firenze')} target="_blank" rel="noopener noreferrer" aria-label="Instagram"
-                  style={{ width: 48, height: 48, border: '1px solid rgba(var(--color-primary-rgb), 0.25)', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
+                  style={{ width: 48, height: 48, border: '1px solid var(--menu-pill-border)', background: 'var(--menu-pill-bg)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
                   <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: 22, height: 22 }}>
                     <defs>
                       <linearGradient id="ig-mob" x1="0" y1="1" x2="1" y2="0">
@@ -376,13 +449,15 @@ export default function Navbar({ onOpenLegal, bannerActive }: { onOpenLegal?: (t
                   </svg>
                 </a>
                 <a href={`https://wa.me/${settings.whatsapp || '393756106713'}`} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp"
-                  style={{ width: 48, height: 48, border: '1px solid rgba(37,211,102,0.3)', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
+                  style={{ width: 48, height: 48, border: '1px solid rgba(37,211,102,0.7)', background: 'var(--menu-pill-bg)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
                   <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style={{ width: 24, height: 24 }}>
                     <path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.948-1.42A9.956 9.956 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2z" fill="#25d366"/>
                     <path d="M16.87 14.814c-.248-.124-1.47-.726-1.697-.808-.228-.083-.394-.124-.56.124-.166.248-.643.808-.788.974-.145.165-.29.186-.538.062-.248-.124-1.049-.387-1.997-1.234-.738-.66-1.236-1.473-1.381-1.722-.145-.248-.015-.382.109-.505.112-.111.248-.29.372-.436.124-.145.165-.248.248-.414.083-.165.041-.31-.021-.434-.062-.124-.56-1.349-.766-1.848-.202-.484-.407-.418-.56-.426-.145-.007-.31-.009-.476-.009a.913.913 0 00-.663.31c-.228.248-.869.85-.869 2.073s.89 2.403 1.014 2.569c.124.165 1.753 2.677 4.248 3.754.594.257 1.057.41 1.419.524.596.19 1.139.163 1.568.099.479-.072 1.47-.601 1.678-1.182.207-.58.207-1.077.145-1.182-.062-.103-.228-.165-.476-.29z" fill="white"/>
                   </svg>
                 </a>
               </motion.div>
+            </div>
+            </div>
             </div>
           </motion.div>
         )}
