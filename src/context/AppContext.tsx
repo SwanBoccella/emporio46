@@ -65,7 +65,7 @@ export interface Sconto {
 // ─── Sfondi del sito (titolo → corpo → piede) ─────────────────────────────────
 // Un unico sistema per tutte le zone della pagina, in ordine di scorrimento.
 // Ogni zona ha gli stessi parametri, gestiti da admin → "Sfondi & Mappa".
-export type SectionBgSlot = 'navbar' | 'hero' | 'marquee' | 'about' | 'catalog' | 'why' | 'reviews' | 'contact' | 'location' | 'footer'
+export type SectionBgSlot = 'navbar' | 'menu' | 'hero' | 'marquee' | 'about' | 'catalog' | 'why' | 'reviews' | 'contact' | 'location' | 'footer'
 export type BgFade = 'both' | 'top' | 'bottom' | 'none'
 export interface SectionBg {
   url: string
@@ -81,10 +81,14 @@ export interface SectionBg {
   scrim: number        // velo del colore di sfondo sopra l'immagine, 0–1 (schiarisce/scurisce per far leggere il testo)
   shadow: number       // alone attorno ai testi, 0–1 (leggibilità sopra le foto)
   scrimShape: 'flat' | 'side'  // velo uniforme oppure concentrato dietro al testo (lato sinistro; in verticale dall'alto)
+  video?: string       // video di sfondo (mp4/webm, sempre muto e in loop). Se vuoto si usa l'immagine
+  poster?: string      // fotogramma mostrato prima che il video parta (e con "riduci animazioni")
+  videoSpeed?: number  // velocità di riproduzione, 0.25–2
 }
 
 export const SECTION_BG_LABELS: Record<SectionBgSlot, string> = {
   navbar: 'Barra di navigazione',
+  menu: 'Menu mobile (a tutto schermo)',
   hero: 'Copertina (titolo)',
   marquee: 'Striscia categorie',
   about: 'Chi siamo',
@@ -98,19 +102,20 @@ export const SECTION_BG_LABELS: Record<SectionBgSlot, string> = {
 
 // Raggruppamento mostrato nell'admin, nello stesso ordine della pagina
 export const SECTION_BG_GROUPS: { title: string; slots: SectionBgSlot[] }[] = [
-  { title: 'Titolo · testata', slots: ['navbar', 'hero'] },
+  { title: 'Titolo · testata', slots: ['navbar', 'menu', 'hero'] },
   { title: 'Corpo · sezioni', slots: ['marquee', 'about', 'catalog', 'why', 'reviews', 'contact', 'location'] },
   { title: 'Piede · footer', slots: ['footer'] },
 ]
 
-const BG_BASE: Omit<SectionBg, 'url' | 'opacity'> = { brightness: 1, blur: 0, sepia: 0, posX: 50, posY: 50, size: 'cover', fade: 'both', fadeSize: 14, scrim: 0, shadow: 0.7, scrimShape: 'flat' }
+const BG_BASE: Omit<SectionBg, 'url' | 'opacity'> = { brightness: 1, blur: 0, sepia: 0, posX: 50, posY: 50, size: 'cover', fade: 'both', fadeSize: 14, scrim: 0, shadow: 0.7, scrimShape: 'flat', video: '', poster: '', videoSpeed: 1 }
 
 // Zone in cui c'è testo sopra l'immagine (solo qui ha senso regolare l'alone e il velo)
 export const SECTION_BG_HAS_TEXT: SectionBgSlot[] = ['hero', 'about', 'catalog', 'why', 'reviews', 'contact', 'location', 'footer']
 
 export const SECTION_BG_DEFAULTS: Record<SectionBgSlot, SectionBg> = {
   navbar:   { ...BG_BASE, url: '/bg/nav.jpg',      opacity: 0.55, fade: 'none' },
-  hero:     { ...BG_BASE, url: '/bg/hero-foto.jpg',  opacity: 0.85, brightness: 0.78, sepia: 0.1, posY: 35, fade: 'both', fadeSize: 20, scrim: 0.82, shadow: 0.9, scrimShape: 'side' },
+  menu:     { ...BG_BASE, url: '/bg/menu-candela-poster.jpg', video: '/bg/menu-candela.mp4', poster: '/bg/menu-candela-poster.jpg', opacity: 1, fade: 'none' },
+  hero:     { ...BG_BASE, url: '/bg/hero-foto.jpg', video: '/bg/hero-video.mp4', poster: '/bg/hero-video-poster.jpg', opacity: 1, brightness: 1, sepia: 0, posY: 50, fade: 'none', fadeSize: 0, scrim: 0.55, shadow: 0.9, scrimShape: 'side' },
   marquee:  { ...BG_BASE, url: '/bg/marquee.jpg',  opacity: 0.30, fade: 'none' },
   about:    { ...BG_BASE, url: '/bg/about-foto.jpg',  opacity: 0.30, blur: 3, posY: 55 },
   catalog:  { ...BG_BASE, url: '/bg/catalog-foto.jpg', opacity: 0.30, blur: 3, posY: 40, scrim: 0.3 },
@@ -118,7 +123,7 @@ export const SECTION_BG_DEFAULTS: Record<SectionBgSlot, SectionBg> = {
   reviews:  { ...BG_BASE, url: '/bg/reviews-foto.jpg', opacity: 0.45, brightness: 0.65, blur: 3, posY: 50 },
   contact:  { ...BG_BASE, url: '/bg/contact.jpg',  opacity: 0.30 },
   location: { ...BG_BASE, url: '/bg/location.jpg', opacity: 0.30 },
-  footer:   { ...BG_BASE, url: '/bg/footer.jpg',   opacity: 0.32, brightness: 0.32, sepia: 0.25, fade: 'top', fadeSize: 22, scrim: 0.5 },
+  footer:   { ...BG_BASE, url: '/bg/footer.jpg', video: '/bg/footer-video.mp4', poster: '/bg/footer-video-poster.jpg', opacity: 1, brightness: 1, sepia: 0, fade: 'none', fadeSize: 0, scrim: 0 },
 }
 
 // Chiavi usate dalle versioni ≤ v49 per hero / recensioni / footer: restano come valore di ripiego,
@@ -195,6 +200,10 @@ export interface SiteSettings {
   footerTagline: string
   footerRights: string
   footerDesign: string
+  /** Riquadri del footer: opacità del fondo (0 = trasparenti, 1 = pieni), sfocatura dello sfondo in px, intensità del bordo */
+  footerGlass?: number
+  footerGlassBlur?: number
+  footerGlassBorder?: number
   logoUrl: string
   faviconUrl: string
   // Texts
@@ -307,6 +316,9 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   footerTagline: 'Non smettere mai di sognare.',
   footerRights: '© 2026 Emporio 46 · Firenze',
   footerDesign: 'Design by Swan Boccella',
+  footerGlass: 0.56,
+  footerGlassBlur: 7,
+  footerGlassBorder: 0.3,
   logoUrl: '/logo.png',
   faviconUrl: '/favicon.png',
   leadText: "Arredi vintage, lampade e bijoux scelti uno a uno.\nPezzi che hanno già una storia, pronti a iniziarne un'altra a casa vostra.",
@@ -387,7 +399,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   legalRevision: 'ottobre 2026',
   accreditations: [
     { name: 'Camera di Commercio di Firenze', logoUrl: '/accrediti/camera-commercio-firenze.svg', link: 'https://www.fi.camcom.it' },
-    { name: "Associazione Antiquari d'Italia", logoUrl: '/accrediti/associazione-antiquari-italia.svg', link: '' },
+    { name: "Associazione Antiquari d'Italia", logoUrl: '/accrediti/associazione-antiquari-italia.svg', link: 'https://www.antiquariditalia.it/it' },
     { name: "Federazione Italiana Mercanti d'Arte", logoUrl: '/accrediti/fima.svg', link: 'https://www.fimantiquari.it' },
     { name: "Confcommercio – Imprese per l'Italia", logoUrl: '/accrediti/confcommercio.svg', link: 'https://www.confcommercio.it' },
   ],

@@ -77,7 +77,7 @@ export function collectAssets({ settings, catalog }: PreloadInput) {
     settings.logoUrl,
     settings.faviconUrl,
     settings.aboutImageUrl,
-    ...(Object.keys(SECTION_BG_DEFAULTS) as SectionBgSlot[]).map(k => getSectionBg(settings, k).url),
+    ...(Object.keys(SECTION_BG_DEFAULTS) as SectionBgSlot[]).map(k => { const b = getSectionBg(settings, k); return b.video ? (b.poster || b.url) : b.url }),
   ])
 
   // Catalogo: TUTTE le immagini (copertina + gallerie) vengono caricate prima di aprire il sito

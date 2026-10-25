@@ -328,10 +328,18 @@ Si impostano su **Netlify → Site configuration → Environment variables** e v
 
 Dopo aver inserito le variabili fai un nuovo deploy. Su EmailJS aggiungi il dominio del sito in *Allowed Origins*.
 
+### Sfondi: immagini e video (Admin → Sfondi & Mappa)
+Ogni zona (barra, **menu mobile**, copertina, sezioni, footer) ha immagine **e** video di sfondo, con gli stessi controlli: opacità, luminosità, sfocatura, seppia, posizione, velo, sfumatura dei bordi. Il video (MP4 H.264 o WebM, max 36 MB, meglio < 6 MB) si carica dall'admin o si incolla come URL; il fotogramma iniziale (poster) viene creato in automatico. Rimuovendo il video resta l'immagine. I tre video predefiniti sono in `public/bg/` (copertina, menu, footer). Se in passato avevi già modificato gli sfondi di copertina o footer, premi **↺ Default** su quella card per ripartire dai nuovi valori.
+
+I video caricati vanno su Netlify Blobs e sono serviti da `/media/<id>` con supporto Range (necessario a Safari/iOS).
+
+### Trasparenza del footer
+Nella card **Footer** di *Sfondi & Mappa*: opacità, sfocatura e bordo dei riquadri di testo (0 = completamente trasparenti).
+
 ### Accreditamenti nel footer
 Si gestiscono da **Admin → Accreditamenti** (4 slot: nome, logo, link). Per mostrare i loghi a tutti i visitatori usa un URL o un file in `public/accrediti/` (es. `/accrediti/ente.png`). Inserisci solo enti di cui il negozio è davvero iscritto/accreditato.
 
-Di default sono precompilati Camera di Commercio di Firenze, Associazione Antiquari d'Italia, FIMA e Confcommercio, con badge tipografici in `public/accrediti/*.svg` (non sono i loghi ufficiali): per usare i loghi ufficiali sovrascrivi i file con lo stesso nome (o carica i loghi dall'admin) e verifica i link.
+Di default sono precompilati Camera di Commercio di Firenze, Associazione Antiquari d'Italia (link: https://www.antiquariditalia.it/it), FIMA e Confcommercio, con badge tipografici in `public/accrediti/*.svg` (non sono i loghi ufficiali): per usare i loghi ufficiali sovrascrivi i file con lo stesso nome (o carica i loghi dall'admin) e verifica i link.
 
 ### Salvataggio sul Gist e notifiche
 Ogni modifica dall'admin (impostazioni, catalogo, recensioni, SEO, traduzioni EN, accreditamenti) viene salvata sul Gist dopo 1,5 s di quiete, **sempre con i dati più recenti**. In basso compare una notifica:

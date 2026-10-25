@@ -10,22 +10,6 @@ export default function FooterSection({ onOpenLegal }: { onOpenLegal?: (tab: str
   const { t, lang, settings, settingsEn, reviews, isAdmin } = useApp()
   const ref = useRef<HTMLElement>(null)
   const inView = useInView(ref, { once: true, amount: 0.15 })
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const reduceMotion = typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-
-  // Il video del footer parte solo quando il footer è davvero visibile e si ferma quando esce dallo schermo (batteria, dati, fluidità)
-  useEffect(() => {
-    const v = videoRef.current
-    const host = ref.current
-    if (!v || !host || reduceMotion) return
-    v.muted = true
-    const io = new IntersectionObserver(([e]) => {
-      if (e.isIntersecting) v.play().catch(() => {})
-      else v.pause()
-    }, { threshold: 0.05 })
-    io.observe(host)
-    return () => io.disconnect()
-  }, [reduceMotion])
 
   const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -47,32 +31,23 @@ export default function FooterSection({ onOpenLegal }: { onOpenLegal?: (tab: str
     ...(settings.whatsappCatalog ? [{ icon: '▤', label: lang === 'it' ? 'Catalogo WhatsApp' : 'WhatsApp catalog', href: settings.whatsappCatalog }] : []),
   ]
 
+  // Ogni gruppo di testo ha il suo riquadro semitrasparente (il video si vede attraverso, il testo resta leggibile grazie a blur e alone), ma tra un riquadro e l'altro lo sfondo resta visibile
+  const gA = Math.round(Math.max(0, Math.min(1, settings.footerGlass ?? 0.56)) * 100)
+  const gB = Math.max(0, Math.min(24, settings.footerGlassBlur ?? 7))
+  const gBd = Math.max(0, Math.min(1, settings.footerGlassBorder ?? 0.3))
+  const gBlur = gB > 0 ? `blur(${gB}px) saturate(1.1)` : 'none'
+  const glass: React.CSSProperties = { background: `color-mix(in srgb, var(--color-bg-card) ${gA}%, transparent)`, backdropFilter: gBlur, WebkitBackdropFilter: gBlur, textShadow: '0 0 8px rgba(var(--text-halo-rgb, 255,255,255), 0.85), 0 0 18px rgba(var(--text-halo-rgb, 255,255,255), 0.6)', border: `1px solid rgba(var(--color-primary-rgb), ${gBd})`, borderRadius: 24, boxShadow: gA < 8 ? 'none' : '0 14px 40px rgba(0,0,0,0.22)', padding: 'clamp(1.4rem,3.5vw,2.2rem) clamp(1.3rem,3.5vw,2.2rem)' }
+
   const ease = [0.16, 1, 0.3, 1] as [number, number, number, number]
 
   return (
     <footer ref={ref} style={{ position: 'relative', overflow: 'hidden', isolation: 'isolate', borderTop: '1px solid rgba(var(--color-primary-rgb), 0.18)' }}>
 
-      {/* Sfondo: immagine e parametri da admin → Sfondi & Mappa */}
-      <SectionBackdrop slot="footer" scale={1.06} />
-
-      {/* Video di sfondo: copre l'intero footer, a ciclo continuo (con "riduci animazioni" resta solo il fotogramma) */}
-      <div aria-hidden="true" style={{ position: 'absolute', inset: 0, zIndex: 0, overflow: 'hidden', pointerEvents: 'none', background: '#0b0805' }}>
-        {reduceMotion ? (
-          <img src="/bg/footer-video-poster.jpg" alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        ) : (
-          <video
-            ref={videoRef}
-            src="/bg/footer-video.mp4"
-            poster="/bg/footer-video-poster.jpg"
-            muted loop playsInline preload="metadata"
-            disablePictureInPicture
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          />
-        )}
-      </div>
+      {/* Sfondo (video o immagine) e relativi parametri: admin → Sfondi & Mappa */}
+      <SectionBackdrop slot="footer" />
 
       {/* Velo leggero: la leggibilità non dipende dal video, il testo sta nel pannello opaco qui sotto */}
-      <div aria-hidden="true" style={{ position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none', background: 'linear-gradient(to bottom, rgba(8,5,3,0.35) 0%, rgba(8,5,3,0.15) 50%, rgba(8,5,3,0.4) 100%)' }} />
+      <div aria-hidden="true" style={{ position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none', background: 'linear-gradient(to bottom, rgba(8,5,3,0.12) 0%, rgba(8,5,3,0.04) 50%, rgba(8,5,3,0.18) 100%)' }} />
 
       {/* Gold bottom glow */}
       <div style={{ position: 'absolute', inset: 0, zIndex: 2, background: 'radial-gradient(ellipse 80% 45% at 50% 105%, rgba(150,90,15,0.2) 0%, transparent 65%)' }} />
@@ -84,14 +59,12 @@ export default function FooterSection({ onOpenLegal }: { onOpenLegal?: (tab: str
       }} />
 
       {/* Content */}
-      <div style={{ position: 'relative', zIndex: 10, padding: 'clamp(3rem,8vw,7rem) clamp(0.8rem,4vw,6rem)' }}>
-      {/* Pannello opaco: qualunque immagine venga messa dietro al footer, il testo mantiene sempre il contrasto del tema */}
-      <div style={{ maxWidth: 1400, margin: '0 auto', background: 'color-mix(in srgb, var(--color-bg-card) 94%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(var(--color-primary-rgb), 0.3)', borderRadius: 28, boxShadow: '0 24px 70px rgba(0,0,0,0.2)', padding: 'clamp(2.2rem,6vw,5rem) clamp(1.3rem,5vw,4.5rem)' }}>
+      <div style={{ position: 'relative', zIndex: 10, padding: 'clamp(2rem,6vw,5rem) clamp(0.9rem,4vw,6rem)', maxWidth: 1400, margin: '0 auto' }}>
 
         {/* Ornamental divider */}
         <motion.div
           className="divider-line"
-          style={{ marginBottom: '5rem' }}
+          style={{ ...glass, padding: '0.9rem 1.4rem', borderRadius: 999, marginBottom: '1.5rem', justifyContent: 'center' }}
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }} viewport={REVEAL_VP}
           transition={{ duration: 1.44, ease }}
@@ -102,10 +75,10 @@ export default function FooterSection({ onOpenLegal }: { onOpenLegal?: (tab: str
         </motion.div>
 
         {/* Grid */}
-        <div className="footer-grid" style={{ marginBottom: '5rem' }}>
+        <div className="footer-grid" style={{ marginBottom: '1.5rem', gap: '1.5rem' }}>
 
           {/* Brand */}
-          <motion.div initial={{ opacity: 0, y: 28 }} whileInView={{ opacity: 1, y: 0 }} viewport={REVEAL_VP} transition={{ duration: 1.44, delay: 0.08, ease }}>
+          <motion.div style={glass} initial={{ opacity: 0, y: 28 }} whileInView={{ opacity: 1, y: 0 }} viewport={REVEAL_VP} transition={{ duration: 1.44, delay: 0.08, ease }}>
             <button onClick={() => scrollTo('hero')} style={{ borderRadius: 999, fontFamily: 'var(--font-label)', fontSize: '1.6rem', fontWeight: 500, letterSpacing: '0.14em', color: 'var(--color-text)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: '1.2rem', display: 'block', textAlign: 'left' }}>
               {(settings.siteName || 'Emporio 46').split(' ').map((w: string, i: number) => (
                 <span key={i}><span style={{ color: 'var(--color-primary-text, var(--color-primary))' }}>{w.charAt(0).toUpperCase()}</span>{w.slice(1).toUpperCase()}{' '}</span>
@@ -152,7 +125,7 @@ export default function FooterSection({ onOpenLegal }: { onOpenLegal?: (tab: str
           </motion.div>
 
           {/* Navigation */}
-          <motion.div initial={{ opacity: 0, y: 28 }} whileInView={{ opacity: 1, y: 0 }} viewport={REVEAL_VP} transition={{ duration: 1.44, delay: 0.15, ease }}>
+          <motion.div style={glass} initial={{ opacity: 0, y: 28 }} whileInView={{ opacity: 1, y: 0 }} viewport={REVEAL_VP} transition={{ duration: 1.44, delay: 0.15, ease }}>
             <p style={{ fontFamily: 'var(--font-label)', fontSize: '1rem', fontWeight: 600, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--color-primary-text, var(--color-primary))', marginBottom: '1.4rem' }}>
               {lang === 'it' ? 'Navigazione' : 'Navigation'}
             </p>
@@ -171,7 +144,7 @@ export default function FooterSection({ onOpenLegal }: { onOpenLegal?: (tab: str
           </motion.div>
 
           {/* Contacts */}
-          <motion.div initial={{ opacity: 0, y: 28 }} whileInView={{ opacity: 1, y: 0 }} viewport={REVEAL_VP} transition={{ duration: 1.44, delay: 0.29, ease }}>
+          <motion.div style={glass} initial={{ opacity: 0, y: 28 }} whileInView={{ opacity: 1, y: 0 }} viewport={REVEAL_VP} transition={{ duration: 1.44, delay: 0.29, ease }}>
             <p style={{ fontFamily: 'var(--font-label)', fontSize: '1rem', fontWeight: 600, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--color-primary-text, var(--color-primary))', marginBottom: '1.4rem' }}>
               {lang === 'it' ? 'Contatti' : 'Contacts'}
             </p>
@@ -200,7 +173,7 @@ export default function FooterSection({ onOpenLegal }: { onOpenLegal?: (tab: str
           return (
             <motion.div
               initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={REVEAL_VP} transition={{ duration: 1.44, delay: 0.32, ease }}
-              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '3.2rem' }}
+              style={{ ...glass, display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '1.5rem' }}
             >
               <p style={{ fontFamily: 'var(--font-label)', fontSize: '1rem', fontWeight: 600, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--color-primary-text, var(--color-primary))', marginBottom: '1.4rem', textAlign: 'center' }}>
                 {lang === 'it' ? 'Garanzie e accreditamenti' : 'Guarantees & accreditations'}
@@ -211,9 +184,10 @@ export default function FooterSection({ onOpenLegal }: { onOpenLegal?: (tab: str
                   const inner = a.logoUrl
                     ? <img src={a.logoUrl} alt={a.name || (lang === 'it' ? 'Ente di accreditamento' : 'Accreditation body')} loading="lazy" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
                     : <span style={{ fontFamily: 'var(--font-label)', fontSize: '0.8rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-text-soft, var(--color-text))', textAlign: 'center' }}>Logo ente {i + 1}<br />(admin)</span>
-                  const hover = a.link ? { onMouseEnter: (e: any) => { e.currentTarget.style.transform = 'translateY(-3px)' }, onMouseLeave: (e: any) => { e.currentTarget.style.transform = 'none' } } : {}
-                  return a.link && a.logoUrl
-                    ? <a key={i} href={safeHref(a.link)} target="_blank" rel="noopener noreferrer" aria-label={a.name} style={tile} {...hover}>{inner}</a>
+                  const link = a.link || (/antiquari\s*d['’]?\s*italia/i.test(a.name || '') ? 'https://www.antiquariditalia.it/it' : '')
+                  const hover = link ? { onMouseEnter: (e: any) => { e.currentTarget.style.transform = 'translateY(-3px)' }, onMouseLeave: (e: any) => { e.currentTarget.style.transform = 'none' } } : {}
+                  return link && a.logoUrl
+                    ? <a key={i} href={safeHref(link)} target="_blank" rel="noopener noreferrer" aria-label={a.name} style={tile} {...hover}>{inner}</a>
                     : <div key={i} style={tile} title={a.name}>{inner}</div>
                 })}
               </div>
@@ -221,16 +195,13 @@ export default function FooterSection({ onOpenLegal }: { onOpenLegal?: (tab: str
           )
         })()}
 
-        {/* Divider line */}
-        <div style={{ height: 1, background: 'linear-gradient(90deg, transparent, rgba(var(--color-primary-rgb), 0.15), rgba(var(--color-primary-rgb), 0.08), transparent)', marginBottom: '2.5rem' }} />
-
 
         {/* Bottom bar */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           whileInView={{ opacity: 1, y: 0 }} viewport={REVEAL_VP}
           transition={{ duration: 1.44, delay: 0.38, ease }}
-          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}
+          style={{ ...glass, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}
         >
           <p style={{ fontFamily: 'var(--font-label)', fontSize: '0.92rem', fontWeight: 500, letterSpacing: '0.06em', color: 'var(--color-text)', textTransform: 'uppercase', lineHeight: 1.6 }}>
             {settings.footerRights}{lang === 'it' && settings.pivaText ? ` · ${settings.pivaText}` : ''}
@@ -277,7 +248,6 @@ export default function FooterSection({ onOpenLegal }: { onOpenLegal?: (tab: str
             ))}
           </div>
         </motion.div>
-      </div>
       </div>
     </footer>
   )

@@ -12,10 +12,8 @@ export default function Navbar({ onOpenLegal, bannerActive }: { onOpenLegal?: (t
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const navTop = bannerActive ? 36 : 0
-  const videoRef = useRef<HTMLVideoElement | null>(null)
   // Il pill (sfondo tema) si nasconde quando il menu è aperto: sopra al video scuro restano solo testi chiari
   const pillOn = scrolled && !menuOpen
-  const reduceMotion = typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
   // Il menu ha sempre sfondo scuro (video della candela), quindi ogni testo sta dentro una "pillola" opaca che garantisce il contrasto:
   //  - tema scuro  → testo SCURO su pillola CHIARA
   //  - tema chiaro → testo CHIARO su pillola SCURA
@@ -66,14 +64,6 @@ export default function Navbar({ onOpenLegal, bannerActive }: { onOpenLegal?: (t
     if (menuOpen) { root.dataset.menu = '1'; getLenis()?.stop() }
     else { delete root.dataset.menu; getLenis()?.start() }
     return () => { delete root.dataset.menu; getLenis()?.start() }
-  }, [menuOpen])
-
-  useEffect(() => {
-    if (!menuOpen) return
-    const v = videoRef.current
-    if (!v) return
-    v.muted = true
-    v.play().catch(() => { /* risparmio dati / autoplay bloccato: resta il poster */ })
   }, [menuOpen])
 
   const goToBook = () => {
@@ -285,21 +275,9 @@ export default function Navbar({ onOpenLegal, bannerActive }: { onOpenLegal?: (t
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.26, ease: [0.32, 0.72, 0, 1] }}
           >
-            {/* Sfondo: video a ciclo continuo (solo poster se l'utente riduce le animazioni) */}
-            <div aria-hidden="true" style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
-              {reduceMotion ? (
-                <img src="/bg/menu-candela-poster.jpg" alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              ) : (
-                <video
-                  ref={videoRef}
-                  src="/bg/menu-candela.mp4"
-                  poster="/bg/menu-candela-poster.jpg"
-                  autoPlay muted loop playsInline
-                  preload="auto"
-                  disablePictureInPicture
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
-              )}
+            {/* Sfondo del menu: video o immagine, tutti i parametri da admin → Sfondi & Mappa */}
+            <div aria-hidden="true" style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', isolation: 'isolate' }}>
+              <SectionBackdrop slot="menu" />
               {/* Velo leggero: il contrasto del testo è garantito dalle pillole, non dal video */}
               <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(8,5,3,0.25) 0%, rgba(8,5,3,0.1) 45%, rgba(8,5,3,0.3) 100%)' }} />
             </div>

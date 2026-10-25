@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useLayoutEffect, useRef, type CSSProperties } from 'react'
+import { forwardRef, useCallback, useEffect, useLayoutEffect, useRef, type CSSProperties } from 'react'
 import { useApp, getSectionBg, SECTION_BG_HAS_TEXT, type SectionBg, type SectionBgSlot } from '../../context/AppContext'
 
 /** Maschera che sfuma i bordi: quali (fade) e quanto (fadeSize, % dell'altezza) dipendono dall'admin. */
@@ -52,6 +52,60 @@ export function bgScrimStyle(bg: SectionBg): CSSProperties {
 }
 export const bgScrimClass = (bg: SectionBg) => (bg.scrimShape === 'side' ? 'bg-scrim-side' : undefined)
 
+/** Stile del livello video: stessi filtri, opacità e sfumatura bordi dell'immagine, ma con object-fit/position al posto di background-*. */
+export function bgVideoStyle(bg: SectionBg): CSSProperties {
+  const { backgroundImage, backgroundSize, backgroundRepeat, backgroundPosition, ...rest } = bgLayerStyle(bg)
+  return { ...rest, width: '100%', height: '100%', objectFit: 'cover', objectPosition: `${bg.posX}% ${bg.posY}%`, display: 'block' }
+}
+
+/**
+ * Livello multimediale di una zona: video (se impostato) oppure immagine.
+ * Il video è sempre muto e in loop, parte solo quando la zona è visibile e si ferma quando esce dallo schermo
+ * (batteria e dati). Con "riduci animazioni" o prima che parta si vede il fotogramma (poster).
+ * Usato dal sito (SectionBackdrop) e dalle anteprime dell'admin: quello che si vede lì è quello che vedono i visitatori.
+ */
+export function BgMedia({ bg, slot, style, fill }: { bg: SectionBg; slot?: SectionBgSlot; style?: CSSProperties; fill?: boolean }) {
+  const vRef = useRef<HTMLVideoElement>(null)
+  const reduceMotion = typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  const useVideo = !!bg.video && !reduceMotion
+  const still = bg.video ? (bg.poster || bg.url) : bg.url
+
+  useEffect(() => {
+    const v = vRef.current
+    const host = v?.parentElement
+    if (!v || !host || !useVideo) return
+    v.muted = true
+    v.playbackRate = Math.max(0.25, Math.min(2, Number(bg.videoSpeed) || 1))
+    const io = new IntersectionObserver(([e]) => {
+      // con il menu mobile aperto si fermano i video della pagina (tranne quello del menu stesso)
+      const menuBlocks = !!document.documentElement.dataset.menu && slot !== 'menu'
+      if (e.isIntersecting && !menuBlocks) v.play().catch(() => { /* autoplay bloccato / risparmio dati: resta il poster */ })
+      else v.pause()
+    }, { threshold: 0.02 })
+    io.observe(host)
+    return () => io.disconnect()
+  }, [useVideo, bg.video, bg.videoSpeed, slot])
+
+  if (useVideo) {
+    return (
+      <video
+        ref={vRef}
+        key={bg.video}
+        src={bg.video}
+        poster={bg.poster || undefined}
+        autoPlay muted loop playsInline
+        preload={slot === 'hero' || slot === 'menu' ? 'auto' : 'metadata'}
+        disablePictureInPicture
+        aria-hidden="true"
+        data-bg-slot={slot}
+        style={{ ...(fill ? { position: 'absolute', inset: 0 } : null), ...bgVideoStyle(bg), pointerEvents: 'none', ...style }}
+      />
+    )
+  }
+  if (!still) return null
+  return <div aria-hidden="true" data-bg-slot={slot} style={{ ...(fill ? { position: 'absolute', inset: 0 } : null), ...bgLayerStyle({ ...bg, url: still }), pointerEvents: 'none', ...style }} />
+}
+
 interface Props {
   slot: SectionBgSlot
   /** ingrandimento per nascondere i bordi durante parallasse (es. hero) */
@@ -74,7 +128,7 @@ const SectionBackdrop = forwardRef<HTMLDivElement, Props>(function SectionBackdr
   const bg = getSectionBg(settings, slot)
   const hasText = SECTION_BG_HAS_TEXT.includes(slot)
   const markerRef = useRef<HTMLDivElement | null>(null)
-  const shadow = bg.url && hasText ? bg.shadow : 0
+  const shadow = (bg.url || bg.video) && hasText ? bg.shadow : 0
 
   // alone dei testi: classe + variabile CSS sul contenitore (text-shadow è ereditato dai discendenti)
   useLayoutEffect(() => {
@@ -83,7 +137,7 @@ const SectionBackdrop = forwardRef<HTMLDivElement, Props>(function SectionBackdr
     host.classList.add('bg-readable')
     host.style.setProperty('--bg-shadow', String(shadow))
     return () => { host.classList.remove('bg-readable'); host.style.removeProperty('--bg-shadow') }
-  }, [shadow, hasText, bg.url])
+  }, [shadow, hasText, bg.url, bg.video])
 
   const setRefs = useCallback((el: HTMLDivElement | null) => {
     markerRef.current = el
@@ -91,8 +145,7 @@ const SectionBackdrop = forwardRef<HTMLDivElement, Props>(function SectionBackdr
     else if (ref) (ref as { current: HTMLDivElement | null }).current = el
   }, [ref])
 
-  if (!bg.url) return null
-  const base = bgLayerStyle(bg)
+  if (!bg.url && !bg.video) return null
   return (
     <>
       <div
@@ -100,14 +153,15 @@ const SectionBackdrop = forwardRef<HTMLDivElement, Props>(function SectionBackdr
         aria-hidden="true"
         data-bg-slot={slot}
         style={{
-          position: 'absolute', inset: 0, zIndex: -1, pointerEvents: 'none',
-          ...base,
-          opacity: visible ? bg.opacity : 0,
+          position: 'absolute', inset: 0, zIndex: -1, pointerEvents: 'none', overflow: 'hidden',
+          opacity: visible ? 1 : 0,
           transition: 'opacity 0.45s',
           transform: scale ? `scale(${scale}) translateZ(0)` : 'translateZ(0)',   // layer GPU: scroll fluido
           ...style,
         }}
-      />
+      >
+        <BgMedia bg={bg} slot={slot} fill />
+      </div>
       {bg.scrim > 0 && hasText && (
         <div aria-hidden="true" className={bgScrimClass(bg)} data-bg-scrim={slot} style={{ position: 'absolute', inset: 0, zIndex: -1, pointerEvents: 'none', ...bgScrimStyle(bg) }} />
       )}

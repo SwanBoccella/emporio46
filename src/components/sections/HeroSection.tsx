@@ -3,36 +3,25 @@ import { motion, useMotionValue, useSpring } from 'framer-motion'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import * as THREE from 'three'
-import { useApp } from '../../context/AppContext'
+import { useApp, getSectionBg } from '../../context/AppContext'
+import { BgMedia, bgScrimStyle, bgScrimClass } from '../ui/SectionBackdrop'
 import HeroOrb from '../ui/HeroOrb'
 import { markReady } from '../../utils/warmup'
 
 gsap.registerPlugin(ScrollTrigger)
 
 // Colore principale del tema (hex) -> [r,g,b], per i contesti JS (three.js / canvas)
-/** Sfondo del titolo: video a ciclo continuo (solo fotogramma se si riducono le animazioni), con velo per la leggibilità. */
+/** Sfondo della copertina: video (o immagine) con tutti i parametri da admin → Sfondi & Mappa. */
 function HeroVideoBackdrop({ bgRef }: { bgRef: React.RefObject<HTMLDivElement> }) {
-  const vRef = useRef<HTMLVideoElement>(null)
-  const reduceMotion = typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-  useEffect(() => {
-    const v = vRef.current, host = bgRef.current?.parentElement
-    if (!v || !host || reduceMotion) return
-    v.muted = true
-    // Si ferma quando l'hero esce dallo schermo o il menu è aperto (batteria e fluidità)
-    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting && !document.documentElement.dataset.menu) v.play().catch(() => {}); else v.pause() }, { threshold: 0.02 })
-    io.observe(host)
-    return () => io.disconnect()
-  }, [reduceMotion, bgRef])
+  const { settings } = useApp()
+  const bg = getSectionBg(settings, 'hero')
   return (
-    <div ref={bgRef} aria-hidden="true" style={{ position: 'absolute', inset: 0, zIndex: -1, pointerEvents: 'none', transform: 'scale(1.1) translateZ(0)', overflow: 'hidden', background: '#0b0805' }}>
-      {reduceMotion ? (
-        <img src="/bg/hero-video-poster.jpg" alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-      ) : (
-        <video ref={vRef} src="/bg/hero-video.mp4" poster="/bg/hero-video-poster.jpg" autoPlay muted loop playsInline preload="auto" disablePictureInPicture style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-      )}
-      {/* Velo del colore del tema: il testo deve restare sempre leggibile anche se il video cambia */}
-      <div className="bg-scrim-side" style={{ position: 'absolute', inset: 0, ['--scrim' as any]: 0.5 }} />
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(var(--color-bg-rgb), 0.1)' }} />
+    <div ref={bgRef} aria-hidden="true" style={{ position: 'absolute', inset: 0, zIndex: -1, pointerEvents: 'none', transform: 'scale(1.1) translateZ(0)', overflow: 'hidden' }}>
+      <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
+        <BgMedia bg={bg} slot="hero" fill />
+      </div>
+      {/* Velo del colore del tema: regolabile da admin, per tenere leggibile il testo anche se il video cambia */}
+      {bg.scrim > 0 && <div className={bgScrimClass(bg)} style={{ position: 'absolute', inset: 0, ...bgScrimStyle(bg) }} />}
     </div>
   )
 }
@@ -302,7 +291,7 @@ export default function HeroSection() {
   }
 
   return (
-    <section id="hero" ref={sectionRef} className="relative flex flex-col items-center justify-center overflow-hidden bg-readable" style={{ ['--bg-shadow' as any]: 0.9, background: 'var(--color-bg, #070503)', isolation: 'isolate', minHeight: 'min(100svh, 58rem)' }}>
+    <section id="hero" ref={sectionRef} className="relative flex flex-col items-center justify-center overflow-hidden bg-readable" style={{ ['--bg-shadow' as any]: getSectionBg(settings, 'hero').shadow, background: 'var(--color-bg, #070503)', isolation: 'isolate', minHeight: 'min(100svh, 58rem)' }}>
       <HeroVideoBackdrop bgRef={bgRef} />
       <ThreeBackground />
       <HeroCanvas />

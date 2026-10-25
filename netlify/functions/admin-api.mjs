@@ -9,6 +9,7 @@ import { readStored, verifyPassword, saveNewPassword, makeToken, checkToken, MIN
 
 const FILE = 'mnt_data.json'
 const SESSION_MS = 12 * 60 * 60 * 1000
+const VIDEO_CHUNK = 3 * 1024 * 1024   // deve coincidere con CHUNK in src/utils/adminApi.ts
 const ALLOWED_KEYS = ['settings', 'catalog', 'reviews', 'seo', 'settingsEn']
 
 const json = (status, body) => new Response(JSON.stringify(body), {
@@ -59,7 +60,7 @@ export default async (req) => {
     }
   }
 
-  // ── UPLOAD FILE (immagini e modello 3D) su Netlify Blobs, a pezzi da ~3 MB ──
+  // ── UPLOAD FILE (immagini, video di sfondo e modello 3D) su Netlify Blobs, a pezzi da ~3 MB ──
   if (body.action === 'asset_put') {
     const bearer = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '')
     if (!checkToken(bearer, stored)) return json(401, { error: 'unauthorized' })
@@ -67,19 +68,32 @@ export default async (req) => {
     if (typeof id !== 'string' || !/^[a-f0-9]{24,48}$/.test(id)) return json(400, { error: 'bad_id' })
     if (!Number.isInteger(index) || !Number.isInteger(total) || total < 1 || total > 40 || index < 0 || index >= total) return json(400, { error: 'bad_part' })
     const isModel = mime === 'model/gltf-binary'
-    if (!isModel && !['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(mime)) return json(400, { error: 'bad_mime', message: 'Tipo di file non consentito.' })
-    if (!isModel && total !== 1) return json(400, { error: 'bad_part', message: 'Le immagini devono stare in un solo pezzo.' })
+    const isVideo = mime === 'video/mp4' || mime === 'video/webm'
+    if (!isModel && !isVideo && !['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(mime)) return json(400, { error: 'bad_mime', message: 'Tipo di file non consentito.' })
+    if (!isModel && !isVideo && total !== 1) return json(400, { error: 'bad_part', message: 'Le immagini devono stare in un solo pezzo.' })
+    if (isVideo && total > 12) return json(413, { error: 'too_large', message: 'Video troppo pesante (massimo ~36 MB): comprimilo prima di caricarlo.' })
     if (typeof data !== 'string' || !data.length) return json(400, { error: 'bad_data' })
     let buf
     try { buf = Buffer.from(data, 'base64') } catch { return json(400, { error: 'bad_data' }) }
     if (!buf.length || buf.length > 4_200_000) return json(413, { error: 'too_large', message: 'Pezzo troppo grande.' })
     if (index === 0 && isModel && buf.subarray(0, 4).toString('latin1') !== 'glTF') return json(400, { error: 'bad_glb', message: 'Il file non è un .glb valido.' })
+    if (isVideo) {
+      // i pezzi (tranne l'ultimo) devono essere esattamente da 3 MB: serve a calcolare gli intervalli di byte (Range) in lettura
+      if (index < total - 1 && buf.length !== VIDEO_CHUNK) return json(400, { error: 'bad_part', message: 'Pezzo video di dimensione non valida.' })
+      if (index === 0) {
+        const mp4 = buf.subarray(4, 8).toString('latin1') === 'ftyp'
+        const webm = buf[0] === 0x1a && buf[1] === 0x45 && buf[2] === 0xdf && buf[3] === 0xa3
+        if ((mime === 'video/mp4' && !mp4) || (mime === 'video/webm' && !webm)) return json(400, { error: 'bad_video', message: 'Il file non è un video MP4/WebM valido.' })
+      }
+    }
     try {
       const { getStore } = await import('@netlify/blobs')
       const store = getStore({ name: 'emporio46-assets', consistency: 'strong' })
       await store.set(`${id}/${index}`, buf)
       if (index === total - 1) {
-        await store.setJSON(`${id}/meta`, { mime, total, name: String(name || '').slice(0, 120), at: new Date().toISOString() })
+        const meta = { mime, total, name: String(name || '').slice(0, 120), at: new Date().toISOString() }
+        if (isVideo) { meta.chunk = VIDEO_CHUNK; meta.size = (total - 1) * VIDEO_CHUNK + buf.length }
+        await store.setJSON(`${id}/meta`, meta)
       }
     } catch { return json(500, { error: 'store_failed', message: 'Archivio file (Netlify Blobs) non disponibile. Fai un nuovo deploy.' }) }
     return json(200, { ok: true })

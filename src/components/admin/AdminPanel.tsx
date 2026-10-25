@@ -6,7 +6,7 @@ import type { SiteSettings, SeoData } from '../../context/AppContext'
 import { groqText, groqVision, groqVisionJson, extractJson, testGroq, getGroqKey, setGroqKey, isValidGroqKey, getModelOverride, setModelOverride, DEFAULT_TEXT_MODELS, DEFAULT_VISION_MODELS, type GroqTestResult } from '../../utils/groq'
 import { adminLogin, clearAdminToken, getAdminToken, changeAdminPassword, adminUploadAsset } from '../../utils/adminApi'
 import { THEME_PRESETS, SECTION_BG_LABELS, SECTION_BG_GROUPS, SECTION_BG_HAS_TEXT, SECTION_BG_DEFAULTS, getSectionBg, buildMapsEmbed, SYNC_STATUS } from '../../context/AppContext'
-import { bgLayerStyle, bgScrimStyle, bgScrimClass } from '../ui/SectionBackdrop'
+import { BgMedia, bgScrimStyle, bgScrimClass } from '../ui/SectionBackdrop'
 import type { CatalogItem, Recensione } from '../../types'
 import { DEFAULT_CHAPTERS, DEFAULT_LABEL, resolveChapters, saveLocalModel, clearLocalModel, validateGlb } from '../../utils/armchair'
 
@@ -278,7 +278,7 @@ function ImageUploadZone({ images, onChange, onAiAnalyze }: { images: string[]; 
 // ─── Single image upload (for settings fields) ────────────────────────────────
 // Gli sfondi (sectionBgs + vecchi campi ≤v49) si salvano solo da "Sfondi & Mappa":
 // le altre tab hanno una copia locale che potrebbe essere vecchia e non devono riscriverli.
-const BG_FIELDS = ['sectionBgs', 'heroImageUrl', 'heroImageOpacity', 'heroImageBrightness', 'footerImageUrl', 'footerImageOpacity', 'footerImageBrightness', 'reviewsBgImageUrl', 'reviewsBgOpacity', 'reviewsBgBrightness']
+const BG_FIELDS = ['sectionBgs', 'footerGlass', 'footerGlassBlur', 'footerGlassBorder', 'heroImageUrl', 'heroImageOpacity', 'heroImageBrightness', 'footerImageUrl', 'footerImageOpacity', 'footerImageBrightness', 'reviewsBgImageUrl', 'reviewsBgOpacity', 'reviewsBgBrightness']
 function withoutBgFields<T extends Record<string, any>>(o: T): Partial<T> {
   const out: any = { ...o }
   BG_FIELDS.forEach(k => { delete out[k] })
@@ -2876,7 +2876,8 @@ return (
 // Dove compare ogni sfondo (testo guida mostrato nella card)
 const BG_SLOT_HINTS: Record<string, string> = {
   navbar: 'Dentro la barra in alto: compare quando si scorre la pagina.',
-  hero: 'Copertina a tutto schermo, con effetto parallasse allo scroll.',
+  menu: 'Sfondo del menu a tutto schermo (telefono): di solito un video a ciclo continuo.',
+  hero: 'Copertina a tutto schermo (video o immagine), con effetto parallasse allo scroll.',
   marquee: 'Striscia colorata con i nomi delle categorie.',
   about: 'Sfondo della sezione "Chi siamo".',
   catalog: 'Sfondo dietro la griglia del catalogo.',
@@ -2884,15 +2885,83 @@ const BG_SLOT_HINTS: Record<string, string> = {
   reviews: 'Sfondo della sezione recensioni.',
   contact: 'Sfondo dei moduli di contatto / prenotazione.',
   location: 'Sfondo della sezione mappa e orari.',
-  footer: 'Sfondo del piede della pagina.',
+  footer: 'Sfondo del piede della pagina (video o immagine). Più sotto regoli la trasparenza dei riquadri di testo.',
+}
+
+// Fotogramma di anteprima (poster) estratto dal video appena scelto, nel browser dell'admin
+function makePoster(file: File): Promise<Blob | null> {
+  return new Promise(resolve => {
+    const url = URL.createObjectURL(file)
+    const v = document.createElement('video')
+    v.muted = true; v.playsInline = true; v.preload = 'auto'; v.src = url
+    const done = (b: Blob | null) => { clearTimeout(timer); URL.revokeObjectURL(url); resolve(b) }
+    const timer = setTimeout(() => done(null), 10000)
+    v.onerror = () => done(null)
+    v.onloadeddata = () => { try { v.currentTime = Math.min(0.5, (v.duration || 1) / 4) } catch { done(null) } }
+    v.onseeked = () => {
+      try {
+        const vw = v.videoWidth || 1280, vh = v.videoHeight || 720
+        const w = Math.min(1280, vw), h = Math.round(w * vh / vw)
+        const c = document.createElement('canvas'); c.width = w; c.height = h
+        c.getContext('2d').drawImage(v, 0, 0, w, h)
+        c.toBlob(b => done(b), 'image/jpeg', 0.78)
+      } catch { done(null) }
+    }
+  })
+}
+
+// Video di sfondo di una zona: URL oppure upload (MP4/WebM fino a 36 MB) su Netlify Blobs, con poster automatico
+function VideoField({ video, poster, onChange }: { video: string; poster: string; onChange: (patch: { video?: string; poster?: string }) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+  const MAX = 36 * 1024 * 1024
+  const upload = async (file: File) => {
+    if (!['video/mp4', 'video/webm'].includes(file.type)) { setMsg('Formato non supportato: usa MP4 (H.264) o WebM.'); return }
+    if (file.size > MAX) { setMsg(`Il video pesa ${(file.size / 1048576).toFixed(1)} MB: il massimo è 36 MB (meglio sotto i 6 MB, per un sito veloce da telefono).`); return }
+    if (!getAdminToken()) { setMsg('Sessione non attiva o modalità sviluppo: incolla un URL oppure metti il file in public/bg/.'); return }
+    setBusy(true); setMsg('Caricamento video…')
+    const r = await adminUploadAsset(file, file.type, file.name, (d, t) => setMsg(`Caricamento video… ${d}/${t}`))
+    if (!r.ok) { setBusy(false); setMsg(r.message); return }
+    setMsg('Creo il fotogramma di anteprima…')
+    let posterUrl = ''
+    const pb = await makePoster(file)
+    if (pb) { const pr = await adminUploadAsset(pb, 'image/jpeg', 'poster'); if (pr.ok) posterUrl = `/media/${pr.id}` }
+    onChange({ video: `/media/${r.id}`, poster: posterUrl })
+    setBusy(false)
+    setMsg(`Video caricato (${(file.size / 1048576).toFixed(1)} MB): visibile a tutti dopo il salvataggio automatico.`)
+  }
+  return (
+    <div style={{ marginBottom: '1rem', padding: '0.8rem', border: '1px dashed rgba(201,168,76,0.3)' }}>
+      <label style={labelStyle}>Video di sfondo (se presente sostituisce l'immagine)</label>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+        <input value={video} onChange={e => onChange({ video: e.target.value.trim() })} placeholder="Incolla URL (.mp4 / .webm) oppure carica →" style={{ ...inputStyle, flex: 1, fontSize: '0.78rem' }} />
+        <button disabled={busy} onClick={() => inputRef.current?.click()} style={{ ...btnGhost, fontSize: '0.46rem', padding: '0.4rem 0.75rem', whiteSpace: 'nowrap', opacity: busy ? 0.5 : 1 }}>⬆ Video</button>
+        <input ref={inputRef} type="file" accept="video/mp4,video/webm" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = '' }} />
+      </div>
+      {msg && <p style={{ fontFamily: 'Cormorant Garamond, serif', color: '#c9a84c', fontSize: '0.8rem', margin: '0 0 0.6rem' }}>{msg}</p>}
+      {video && (
+        <>
+          <SingleImageUpload label="Fotogramma iniziale (poster, mostrato prima che il video parta)" value={poster || ''} onChange={v => onChange({ poster: v })} aspectRatio="16/6" hidePreview />
+          <button onClick={() => { onChange({ video: '', poster: '' }); setMsg('') }} style={{ ...btnGhost, fontSize: '0.44rem', padding: '0.3rem 0.6rem', color: '#eb5757' }}>× Rimuovi video (usa solo l'immagine)</button>
+        </>
+      )}
+      <p style={{ fontFamily: 'Cormorant Garamond, serif', color: '#9a8a78', fontSize: '0.74rem', margin: '0.6rem 0 0', lineHeight: 1.4 }}>
+        Sempre muto e a ciclo continuo; parte solo quando la zona è visibile. Con "riduci animazioni" si vede solo il fotogramma.
+      </p>
+    </div>
+  )
 }
 
 function SfondiAdmin() {
   const { settings, updateSettings } = useApp()
+  const settingsRef = useRef(settings)
+  settingsRef.current = settings      // l'upload di un video è asincrono: si parte sempre dalle impostazioni più recenti
 
   // Tutto live: ogni modifica si vede subito sulla landing
   const patchBg = (slot: string, patch: Record<string, unknown>) => {
-    updateSettings({ sectionBgs: { ...(settings.sectionBgs || {}), [slot]: { ...getSectionBg(settings, slot as any), ...patch } } } as Partial<SiteSettings>)
+    const cur = settingsRef.current
+    updateSettings({ sectionBgs: { ...(cur.sectionBgs || {}), [slot]: { ...getSectionBg(cur, slot as any), ...patch } } } as Partial<SiteSettings>)
   }
   const resetBg = (slot: string) => {
     const next = { ...(settings.sectionBgs || {}) } as Record<string, unknown>
@@ -2931,7 +3000,7 @@ function SfondiAdmin() {
       <p style={{ fontFamily: 'Cormorant Garamond, serif', color: '#9a8a78', fontSize: '0.85rem', marginBottom: '2rem', lineHeight: 1.5 }}>
         Tutte le immagini di sfondo del sito, nello stesso ordine in cui compaiono nella pagina: <b>titolo</b> (barra e copertina), <b>corpo</b> (sezioni) e <b>footer</b>.
         Per ognuna scegli l'immagine (carica o incolla un URL) e regola opacità, luminosità, sfocatura, seppia, posizione, ripetizione e sfumatura dei bordi.
-        Per far vedere l'immagine a <b>tutti i visitatori</b> usa un URL (o un file in <code>public/bg/</code>): le immagini caricate qui restano nel browser dell'admin e non vanno sul Gist.
+        Ogni zona può avere anche un <b>video</b> di sfondo (copertina, menu mobile e footer ne hanno già uno): carica un MP4/WebM o incolla un URL, oppure rimuovilo per usare solo l'immagine. Immagini e video caricati da qui vengono pubblicati per tutti i visitatori al salvataggio automatico.
       </p>
 
       {SECTION_BG_GROUPS.map(group => (
@@ -2954,18 +3023,20 @@ function SfondiAdmin() {
 
                   {/* Anteprima fedele: stessi parametri e stesso codice di rendering del sito */}
                   <div style={{ position: 'relative', overflow: 'hidden', isolation: 'isolate', width: '100%', aspectRatio: slot === 'navbar' || slot === 'marquee' ? '16/3' : '16/7', background: settings.bgColor || '#f3e8d4', border: '1px solid rgba(201,168,76,0.2)', marginBottom: '0.8rem' }}>
-                    {bg.url && <div style={{ position: 'absolute', inset: 0, zIndex: -1, ...bgLayerStyle(bg) }} />}
-                    {bg.url && hasText && bg.scrim > 0 && <div className={bgScrimClass(bg)} style={{ position: 'absolute', inset: 0, zIndex: -1, ...bgScrimStyle(bg) }} />}
-                    {bg.url && hasText && (
+                    {(bg.url || bg.video) && <BgMedia key={bg.video || bg.url} bg={bg} slot={slot} fill style={{ zIndex: -1 }} />}
+                    {(bg.url || bg.video) && hasText && bg.scrim > 0 && <div className={bgScrimClass(bg)} style={{ position: 'absolute', inset: 0, zIndex: -1, ...bgScrimStyle(bg) }} />}
+                    {(bg.url || bg.video) && hasText && (
                       <div className="bg-readable" style={{ ['--bg-shadow' as any]: bg.shadow, position: 'absolute', left: '6%', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text, #2b1a12)', fontFamily: 'var(--font-display, serif)', fontSize: '1.15rem', lineHeight: 1.2 }}>
                         Testo di esempio
                         <div style={{ fontFamily: 'var(--font-body, sans-serif)', fontSize: '0.75rem', opacity: 0.85, marginTop: 4 }}>Così si legge sopra la foto</div>
                       </div>
                     )}
-                    {!bg.url && <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Cormorant Garamond, serif', color: '#9a8a78', fontSize: '0.8rem' }}>Nessuna immagine · sfondo disattivato</span>}
+                    {!bg.url && !bg.video && <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Cormorant Garamond, serif', color: '#9a8a78', fontSize: '0.8rem' }}>Nessuna immagine né video · sfondo disattivato</span>}
                   </div>
 
-                  <SingleImageUpload label="Immagine" value={bg.url} onChange={v => patchBg(slot, { url: v })} aspectRatio="16/6" hidePreview />
+                  <SingleImageUpload label={bg.video ? 'Immagine (di riserva se il video non c\'è)' : 'Immagine'} value={bg.url} onChange={v => patchBg(slot, { url: v })} aspectRatio="16/6" hidePreview />
+                  <VideoField video={bg.video || ''} poster={bg.poster || ''} onChange={p => patchBg(slot, p)} />
+                  {bg.video && <BgSlider label="Velocità del video" value={bg.videoSpeed ?? 1} min={0.25} max={2} step={0.05} onChange={v => patchBg(slot, { videoSpeed: v })} />}
 
                   <BgSlider label="Opacità" value={bg.opacity} onChange={v => patchBg(slot, { opacity: v })} />
                   <BgSlider label="Luminosità" value={bg.brightness} min={0} max={1.5} onChange={v => patchBg(slot, { brightness: v })} />
@@ -3006,6 +3077,16 @@ function SfondiAdmin() {
                   <div style={{ marginTop: '1rem' }}>
                     <BgSlider label="Ampiezza sfumatura bordi" value={bg.fadeSize} min={0} max={45} step={1} unit="%" onChange={v => patchBg(slot, { fadeSize: v })} />
                   </div>
+                  {slot === 'footer' && (
+                    <div style={{ marginTop: '1.4rem', paddingTop: '1.2rem', borderTop: '1px solid rgba(201,168,76,0.25)' }}>
+                      <p style={{ ...labelStyle, color: '#e8d9b0', marginBottom: '0.4rem' }}>TRASPARENZA DEI RIQUADRI DEL FOOTER</p>
+                      <p style={{ fontFamily: 'Cormorant Garamond, serif', color: '#9a8a78', fontSize: '0.8rem', margin: '0 0 1rem', lineHeight: 1.4 }}>I riquadri che contengono testi, contatti e loghi. A 0 sono completamente trasparenti: lo sfondo si vede tutto (il testo resta leggibile grazie all'alone).</p>
+                      <BgSlider label="Opacità riquadri (0 = trasparenti)" value={settings.footerGlass ?? 0.56} onChange={v => updateSettings({ footerGlass: v } as Partial<SiteSettings>)} />
+                      <BgSlider label="Sfocatura dello sfondo dietro ai riquadri" value={settings.footerGlassBlur ?? 7} min={0} max={24} step={1} unit="px" onChange={v => updateSettings({ footerGlassBlur: v } as Partial<SiteSettings>)} />
+                      <BgSlider label="Bordo dei riquadri" value={settings.footerGlassBorder ?? 0.3} onChange={v => updateSettings({ footerGlassBorder: v } as Partial<SiteSettings>)} />
+                      <button onClick={() => updateSettings({ footerGlass: undefined, footerGlassBlur: undefined, footerGlassBorder: undefined } as Partial<SiteSettings>)} style={{ ...btnGhost, fontSize: '0.44rem', padding: '0.3rem 0.6rem' }}>↺ Ripristina riquadri</button>
+                    </div>
+                  )}
                   {def.url && bg.url !== def.url && !bg.url.startsWith('data:') && bg.url && (
                     <p style={{ fontFamily: 'Cormorant Garamond, serif', color: '#9a8a78', fontSize: '0.75rem', marginTop: '0.8rem', marginBottom: 0 }}>Predefinita: <code>{def.url}</code></p>
                   )}
@@ -3811,7 +3892,7 @@ function AccreditiAdmin() {
             <input value={a.name} onChange={(e: React.ChangeEvent<HTMLInputElement>) => patch(i, { name: e.target.value })} placeholder="es. nome dell'associazione" style={{ ...inputStyle, marginBottom: '0.8rem' }} />
             <SingleImageUpload label="Logo" value={a.logoUrl} onChange={v => patch(i, { logoUrl: v })} aspectRatio="3/2" />
             <label style={labelStyle}>Link (facoltativo, pagina di verifica dell'ente)</label>
-            <input value={a.link} onChange={(e: React.ChangeEvent<HTMLInputElement>) => patch(i, { link: e.target.value })} placeholder="https://…" style={inputStyle} />
+            <input value={a.link} onChange={(e: React.ChangeEvent<HTMLInputElement>) => patch(i, { link: e.target.value })} placeholder={/antiquari\s*d['’]?\s*italia/i.test(a.name) ? 'https://www.antiquariditalia.it/it' : 'https://…'} style={inputStyle} />
             {a.logoUrl && <button onClick={() => patch(i, { name: '', logoUrl: '', link: '' })} style={{ ...btnGhost, marginTop: '1rem', fontSize: '0.5rem' }}>✕ Svuota slot</button>}
           </div>
         ))}

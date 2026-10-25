@@ -164,7 +164,7 @@ function ItemModal({ item, onClose, t, onOpenLightbox }: { item: CatalogItem; on
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { onClose() }
+      if (e.key === 'Escape' && !(e as any).__lbHandled) { onClose() }
     }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
@@ -182,7 +182,7 @@ function ItemModal({ item, onClose, t, onOpenLightbox }: { item: CatalogItem; on
     setTimeout(() => document.getElementById('contatti')?.scrollIntoView({ behavior: 'smooth' }), 300)
   }
 
-  const openLightbox = (idx: number) => { onClose(); onOpenLightbox(allImages, idx) }
+  const openLightbox = (idx: number) => onOpenLightbox(allImages, idx)   // la scheda resta aperta sotto: chiudendo la foto si torna qui
 
   const handleSwipe = (startX: number, endX: number, startY: number, endY: number, setter: (fn: (i: number) => number) => void, len: number) => {
     const dx = endX - startX
@@ -277,10 +277,10 @@ function ItemModal({ item, onClose, t, onOpenLightbox }: { item: CatalogItem; on
           </div>
         )}
 
-        <div style={{ padding: '2.5rem' }}>
+        <div style={{ padding: 'clamp(1.2rem, 5vw, 2.5rem)' }}>
           <p style={{ fontFamily: 'var(--font-label)', fontSize: '0.66rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: 'var(--color-primary-text, var(--color-primary))', marginBottom: '0.6rem' }}>{item.era} · {item.categoria}</p>
-          <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', color: 'var(--color-text, #f5ede0)', marginBottom: '1rem', fontWeight: 400 }}>{lang === 'en' && item.nomeEn ? item.nomeEn : item.nome}</h3>
-          <p style={{ color: 'var(--color-text-muted, #9a8a78)', fontSize: '1.05rem', lineHeight: 1.75, marginBottom: '1.5rem' }}>{lang === 'en' && item.descrizioneEn ? item.descrizioneEn : item.descrizione}</p>
+          <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.45rem, 6.2vw, 2rem)', lineHeight: 1.2, overflowWrap: 'anywhere', color: 'var(--color-text, #f5ede0)', marginBottom: '1rem', fontWeight: 400 }}>{lang === 'en' && item.nomeEn ? item.nomeEn : item.nome}</h3>
+          <p style={{ color: 'var(--color-text-muted, #9a8a78)', fontSize: 'clamp(0.95rem, 3.8vw, 1.05rem)', lineHeight: 1.7, overflowWrap: 'anywhere', marginBottom: '1.5rem' }}>{lang === 'en' && item.descrizioneEn ? item.descrizioneEn : item.descrizione}</p>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem', padding: '1rem 1.2rem', background: 'rgba(var(--color-primary-rgb), 0.06)', borderLeft: '2px solid rgba(var(--color-primary-rgb), 0.4)', flexWrap: 'wrap' }}>
             {settings.showPrezzi ? (
               <>
@@ -288,13 +288,13 @@ function ItemModal({ item, onClose, t, onOpenLightbox }: { item: CatalogItem; on
                 {item.prezzoScontato ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap' }}>
                     <span style={{ fontFamily: 'var(--font-body)', fontSize: '1.2rem', color: 'var(--color-text-muted, #9a8a78)', textDecoration: 'line-through', letterSpacing: '0.03em' }}>{item.prezzo}</span>
-                    <span style={{ fontFamily: 'var(--font-body)', fontSize: '1.7rem', color: 'var(--color-sale, #eb5757)', fontWeight: 700, letterSpacing: '0.03em' }}>{item.prezzoScontato}</span>
+                    <span style={{ fontFamily: 'var(--font-body)', fontSize: 'clamp(1.35rem, 5.5vw, 1.7rem)', color: 'var(--color-sale, #eb5757)', fontWeight: 700, letterSpacing: '0.03em' }}>{item.prezzoScontato}</span>
                     {item.percentualeSconto && item.percentualeSconto > 0 && (
                       <span style={{ fontFamily: 'var(--font-label)', fontSize: '0.66rem', letterSpacing: '0.15em', color: 'var(--color-sale, #eb5757)', background: 'rgba(235,87,87,0.15)', border: '1px solid rgba(235,87,87,0.4)', padding: '3px 8px', textTransform: 'uppercase' }}>−{item.percentualeSconto}%</span>
                     )}
                   </div>
                 ) : (
-                  <span style={{ fontFamily: 'var(--font-body)', fontSize: '1.45rem', color: item.prezzo && (item.prezzo !== 'Su richiesta' && item.prezzo !== 'On request') ? 'var(--color-primary, #c9a84c)' : 'var(--color-text-muted, #9a8a78)', fontStyle: item.prezzo && (item.prezzo !== 'Su richiesta' && item.prezzo !== 'On request') ? 'normal' : 'italic', fontWeight: item.prezzo && (item.prezzo !== 'Su richiesta' && item.prezzo !== 'On request') ? 600 : 400, letterSpacing: '0.03em' }}>
+                  <span style={{ fontFamily: 'var(--font-body)', fontSize: 'clamp(1.15rem, 4.8vw, 1.45rem)', color: item.prezzo && (item.prezzo !== 'Su richiesta' && item.prezzo !== 'On request') ? 'var(--color-primary, #c9a84c)' : 'var(--color-text-muted, #9a8a78)', fontStyle: item.prezzo && (item.prezzo !== 'Su richiesta' && item.prezzo !== 'On request') ? 'normal' : 'italic', fontWeight: item.prezzo && (item.prezzo !== 'Su richiesta' && item.prezzo !== 'On request') ? 600 : 400, letterSpacing: '0.03em' }}>
                     {item.prezzo || t.catalog.request}
                   </span>
                 )}
@@ -340,14 +340,26 @@ function StandaloneLightbox({ images, startIdx, onClose }: { images: string[]; s
   const touchStartX = useRef<number | null>(null)
   const touchStartY = useRef<number | null>(null)
 
+  // Tasto/gesto "indietro" del telefono: chiude solo la foto ingrandita (e non la scheda o il sito)
+  const pushed = useRef(false)
+  useEffect(() => {
+    try { history.pushState({ lb: 1 }, ''); pushed.current = true } catch { /* noop */ }
+    const onPop = () => { pushed.current = false; onClose() }
+    window.addEventListener('popstate', onPop)
+    return () => {
+      window.removeEventListener('popstate', onPop)
+      if (pushed.current) { pushed.current = false; try { history.back() } catch { /* noop */ } }
+    }
+  }, [])
+
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') { (e as any).__lbHandled = true; onClose() }
       if (e.key === 'ArrowRight') setIdx(i => (i + 1) % images.length)
       if (e.key === 'ArrowLeft') setIdx(i => (i - 1 + images.length) % images.length)
     }
-    window.addEventListener('keydown', h)
-    return () => window.removeEventListener('keydown', h)
+    window.addEventListener('keydown', h, true)   // in fase di cattura: Esc chiude solo la foto, prima che la scheda lo veda
+    return () => window.removeEventListener('keydown', h, true)
   }, [onClose, images.length])
 
   const handleSwipe = (startX: number, endX: number, startY: number, endY: number) => {
@@ -503,49 +515,47 @@ function ListCard({ item, idx, onOpen }: { item: CatalogItem; idx: number; onOpe
       }}
     >
       {/* Thumbnail */}
-      <div style={{ width: 90, flexShrink: 0, background: 'var(--color-bg-card, #2d2318)', overflow: 'hidden', position: 'relative' }}>
+      <div style={{ width: 'clamp(84px, 26vw, 140px)', flexShrink: 0, background: 'var(--color-bg-card, #2d2318)', overflow: 'hidden', position: 'relative' }}>
         {item.img ? (
           <img src={item.img} alt={item.nome} loading="lazy"
-            style={{ width: '100%', height: '100%', objectFit: 'cover', filter: hovered ? 'sepia(0.05) brightness(1.05)' : 'sepia(0.2) brightness(0.85)', transition: 'filter 0.4s' }} />
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: hovered ? 'sepia(0.05) brightness(1.05)' : 'sepia(0.2) brightness(0.85)', transition: 'filter 0.4s' }} />
         ) : (
           <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem', opacity: 0.2 }}>
             {ICONS[item.categoria] || '🏺'}
           </div>
         )}
       </div>
-      {/* Content */}
-      <div style={{ flex: 1, padding: '0.8rem 1.1rem', display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem', flexWrap: 'wrap' }}>
-          <span style={{ fontFamily: 'var(--font-label)', fontSize: '0.66rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: 'var(--color-primary-text, var(--color-primary))' }}>{item.era}</span>
-          <span style={{ fontFamily: 'var(--font-label)', fontSize: '0.66rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--color-text-muted, #6a5a4a)', opacity: 0.7 }}>· {item.categoria}</span>
-          <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-label)', fontSize: '0.66rem', letterSpacing: '0.12em', textTransform: 'uppercase', padding: '0.15rem 0.45rem', flexShrink: 0, ...badgeStyle(item.stato) }}>{item.badge}</span>
-        </div>
-        <p style={{ fontFamily: 'var(--font-display)', fontSize: '0.95rem', color: 'var(--color-text, #f5ede0)', fontWeight: 400, lineHeight: 1.3, marginBottom: '0.2rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      {/* Contenuto: era · categoria, nome, descrizione, poi prezzo e stato sulla stessa riga */}
+      <div style={{ flex: 1, minWidth: 0, padding: '0.85rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+        <span style={{ fontFamily: 'var(--font-label)', fontSize: '0.66rem', letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--color-primary-text, var(--color-primary))', lineHeight: 1.5 }}>
+          {item.era}<span style={{ color: 'var(--color-text-muted, #9a8a78)', opacity: 0.8 }}> · {item.categoria}</span>
+        </span>
+        <p style={{ fontFamily: 'var(--font-display)', fontSize: '1rem', color: 'var(--color-text, #f5ede0)', fontWeight: 400, lineHeight: 1.3, margin: 0, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', overflowWrap: 'anywhere' }}>
           {lang === 'en' && item.nomeEn ? item.nomeEn : item.nome}
         </p>
-        <p style={{ fontSize: '0.78rem', color: 'var(--color-text-muted, #9a8a78)', lineHeight: 1.45, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted, #9a8a78)', lineHeight: 1.45, margin: 0, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', overflowWrap: 'anywhere' }}>
           {lang === 'en' && item.descrizioneEn ? item.descrizioneEn : item.descrizione}
         </p>
-      </div>
-      {/* Price */}
-      <div style={{ padding: '0.8rem 1.1rem', display: 'flex', alignItems: 'center', flexShrink: 0, borderLeft: '1px solid rgba(var(--color-primary-rgb), 0.08)' }}>
-        {settings.showPrezzi ? (
-          item.prezzoScontato ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-              <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.82rem', color: 'var(--color-text-muted, #9a8a78)', textDecoration: 'line-through', lineHeight: 1 }}>{item.prezzo}</span>
-              <span style={{ fontFamily: 'var(--font-body)', fontSize: '1rem', color: 'var(--color-sale, #eb5757)', fontWeight: 700, lineHeight: 1 }}>{item.prezzoScontato}</span>
-              {item.percentualeSconto && item.percentualeSconto > 0 && (
-                <span style={{ fontFamily: 'var(--font-label)', fontSize: '0.66rem', letterSpacing: '0.12em', color: 'var(--color-sale, #eb5757)', background: 'rgba(235,87,87,0.12)', border: '1px solid rgba(235,87,87,0.3)', padding: '1px 5px', textTransform: 'uppercase' }}>−{item.percentualeSconto}%</span>
-              )}
-            </div>
+        <div style={{ marginTop: 'auto', paddingTop: '0.4rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.4rem 0.8rem' }}>
+          {settings.showPrezzi ? (
+            item.prezzoScontato ? (
+              <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: '0.1rem 0.5rem' }}>
+                <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.82rem', color: 'var(--color-text-muted, #9a8a78)', textDecoration: 'line-through', lineHeight: 1 }}>{item.prezzo}</span>
+                <span style={{ fontFamily: 'var(--font-body)', fontSize: '1rem', color: 'var(--color-sale, #eb5757)', fontWeight: 700, lineHeight: 1 }}>{item.prezzoScontato}</span>
+                {item.percentualeSconto && item.percentualeSconto > 0 && (
+                  <span style={{ fontFamily: 'var(--font-label)', fontSize: '0.66rem', letterSpacing: '0.12em', color: 'var(--color-sale, #eb5757)', background: 'rgba(235,87,87,0.12)', border: '1px solid rgba(235,87,87,0.3)', padding: '1px 5px', textTransform: 'uppercase' }}>−{item.percentualeSconto}%</span>
+                )}
+              </div>
+            ) : (
+              <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.95rem', color: item.prezzo && item.prezzo !== 'Su richiesta' && item.prezzo !== 'On request' ? 'var(--color-primary, #c9a84c)' : 'var(--color-text-muted, #6a5a4a)', fontStyle: item.prezzo && item.prezzo !== 'Su richiesta' && item.prezzo !== 'On request' ? 'normal' : 'italic', fontWeight: 600, lineHeight: 1.3 }}>
+                {item.prezzo || t.catalog.request}
+              </span>
+            )
           ) : (
-            <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.95rem', color: item.prezzo && item.prezzo !== 'Su richiesta' && item.prezzo !== 'On request' ? 'var(--color-primary, #c9a84c)' : 'var(--color-text-muted, #6a5a4a)', fontStyle: item.prezzo && item.prezzo !== 'Su richiesta' && item.prezzo !== 'On request' ? 'normal' : 'italic', fontWeight: 600 }}>
-              {item.prezzo || t.catalog.request}
-            </span>
-          )
-        ) : (
-          <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.95rem', color: 'var(--color-text-muted, #6a5a4a)', fontStyle: 'italic' }}>{t.catalog.contactForInfo}</span>
-        )}
+            <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.88rem', color: 'var(--color-text-muted, #6a5a4a)', fontStyle: 'italic', lineHeight: 1.3 }}>{t.catalog.contactForInfo}</span>
+          )}
+          <span style={{ fontFamily: 'var(--font-label)', fontSize: '0.66rem', letterSpacing: '0.12em', textTransform: 'uppercase', padding: '0.15rem 0.45rem', flexShrink: 0, ...badgeStyle(item.stato) }}>{item.badge}</span>
+        </div>
       </div>
       <motion.div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 1, background: 'var(--color-primary)', transformOrigin: 'left', scaleX: 0 }}
         animate={{ scaleX: hovered ? 1 : 0 }} transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }} />
@@ -606,7 +616,7 @@ function FullCatalogPanel({ onClose, onOpenItem }: { onClose: () => void; onOpen
         transition={{ ease: [0.16, 1, 0.3, 1], duration: 0.45, delay: 0.05 }}
       >
         {/* Header */}
-        <div style={{ padding: '1.8rem 2.5rem 1.4rem', borderBottom: '1px solid rgba(var(--color-primary-rgb), 0.12)', display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap', flexShrink: 0 }}>
+        <div style={{ padding: 'clamp(1.2rem, 4vw, 1.8rem) clamp(0.9rem, 4vw, 2.5rem) 1.2rem', borderBottom: '1px solid rgba(var(--color-primary-rgb), 0.12)', display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap', flexShrink: 0 }}>
           <div style={{ flex: 1, minWidth: 200 }}>
             <p style={{ fontFamily: 'var(--font-label)', fontSize: '0.66rem', letterSpacing: '0.35em', textTransform: 'uppercase', color: 'var(--color-primary-text, var(--color-primary))', marginBottom: '0.3rem' }}>{t.catalog.panelLabel}</p>
             <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.4rem, 3vw, 2rem)', color: 'var(--color-text, #f5ede0)', fontWeight: 400, margin: 0, display: 'flex', alignItems: 'baseline', gap: '0.8rem', flexWrap: 'wrap' }}>
@@ -673,7 +683,7 @@ function FullCatalogPanel({ onClose, onOpenItem }: { onClose: () => void; onOpen
         </div>
 
         {/* Category tabs */}
-        <div style={{ padding: '0.9rem 2.5rem', borderBottom: '1px solid rgba(var(--color-primary-rgb), 0.07)', display: 'flex', gap: '0.4rem', flexWrap: 'wrap', flexShrink: 0, background: 'color-mix(in srgb, var(--color-bg, #0a0805) 20%, transparent)' }}>
+        <div style={{ padding: '0.9rem clamp(0.9rem, 4vw, 2.5rem)', borderBottom: '1px solid rgba(var(--color-primary-rgb), 0.07)', display: 'flex', gap: '0.4rem', flexWrap: 'wrap', flexShrink: 0, background: 'color-mix(in srgb, var(--color-bg, #0a0805) 20%, transparent)' }}>
           {cats.map(cat => {
             const count = cat === 'tutti' ? visible.length : visible.filter(i => i.categoria === cat).length
             const active = activeCategory === cat
@@ -699,7 +709,7 @@ function FullCatalogPanel({ onClose, onOpenItem }: { onClose: () => void; onOpen
         </div>
 
         {/* Scrollable content */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '2rem 2.5rem' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: 'clamp(1rem, 4vw, 2rem) clamp(0.9rem, 4vw, 2.5rem)' }}>
           {filtered.length === 0 ? (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
               style={{ textAlign: 'center', padding: '6rem 2rem', color: 'var(--color-text-muted, #9a8a78)' }}>
@@ -790,12 +800,12 @@ function FullCatalogPanel({ onClose, onOpenItem }: { onClose: () => void; onOpen
         </div>
 
         {/* Footer bar */}
-        <div style={{ padding: '0.9rem 2.5rem', borderTop: '1px solid rgba(var(--color-primary-rgb), 0.07)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, background: 'color-mix(in srgb, var(--color-bg, #0a0805) 25%, transparent)' }}>
+        <div style={{ padding: '0.9rem clamp(0.9rem, 4vw, 2.5rem)', borderTop: '1px solid rgba(var(--color-primary-rgb), 0.07)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem 1rem', flexShrink: 0, background: 'color-mix(in srgb, var(--color-bg, #0a0805) 25%, transparent)' }}>
           <p style={{ fontFamily: 'var(--font-body)', fontSize: '0.88rem', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
             {t.catalog.panelFooter}
           </p>
           <motion.button onClick={onClose}
-            style={{ borderRadius: 999, fontFamily: 'var(--font-label)', fontSize: '0.66rem', letterSpacing: '0.16em', textTransform: 'uppercase', padding: '0.55rem 1.3rem', border: '1px solid rgba(var(--color-primary-rgb), 0.2)', background: 'transparent', color: 'var(--color-text-muted, #9a8a78)', cursor: 'pointer' }}
+            style={{ borderRadius: 999, fontFamily: 'var(--font-label)', fontSize: '0.66rem', letterSpacing: '0.16em', textTransform: 'uppercase', padding: '0.55rem 1.3rem', whiteSpace: 'nowrap', border: '1px solid rgba(var(--color-primary-rgb), 0.2)', background: 'transparent', color: 'var(--color-text-muted, #9a8a78)', cursor: 'pointer' }}
             whileHover={{ borderColor: 'var(--color-primary)', color: 'var(--color-primary-text, var(--color-primary))' }}>
             {t.catalog.closePanel}
           </motion.button>
