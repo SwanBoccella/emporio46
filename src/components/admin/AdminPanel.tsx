@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useApp } from '../../context/AppContext'
 import type { SiteSettings, SeoData } from '../../context/AppContext'
-import { groqText, groqVision, groqVisionJson, extractJson, testGroq, groqDiagnose, getGroqKey, setGroqKey, isValidGroqKey, getModelOverride, setModelOverride, DEFAULT_TEXT_MODELS, DEFAULT_VISION_MODELS, type GroqTestResult } from '../../utils/groq'
+import { groqText, groqJson, groqVision, groqVisionJson, extractJson, testGroq, groqDiagnose, getGroqKey, setGroqKey, isValidGroqKey, getModelOverride, setModelOverride, DEFAULT_TEXT_MODELS, DEFAULT_VISION_MODELS, type GroqTestResult } from '../../utils/groq'
 import { adminLogin, clearAdminToken, getAdminToken, changeAdminPassword, adminUploadAsset } from '../../utils/adminApi'
 import { footerGlassStyle, FOOTER_GLASS_DEFAULTS } from '../../utils/footerGlass'
 import { THEME_PRESETS, SECTION_BG_LABELS, SECTION_BG_GROUPS, SECTION_BG_HAS_TEXT, SECTION_BG_DEFAULTS, getSectionBg, buildMapsEmbed, SYNC_STATUS } from '../../context/AppContext'
@@ -1619,6 +1619,7 @@ function MediaAdmin() {
     size: string
     chat: ChatMsg[]
     loading: boolean
+    catalogId?: number   // id dell'oggetto creato nel catalogo da questa perizia
   }
 
   // ── State ─────────────────────────────────────────────────────────────────
@@ -1636,6 +1637,10 @@ function MediaAdmin() {
   const [activeId, setActiveId] = useState<number | null>(null)
   const [prompt, setPrompt] = useState('')
   const [sending, setSending] = useState(false)
+  const { catalog, setCatalog } = useApp()
+  const [pubDraft, setPubDraft] = useState<{ itemId: number; busy: boolean; f: Record<string, any> } | null>(null)
+  const [toast, setToast] = useState('')
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), msg.startsWith('⚠') ? 7000 : 3000) }
   const inputRef = useRef<HTMLInputElement>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -1763,6 +1768,73 @@ Rispondi in modo preciso e professionale, tenendo conto delle correzioni o infor
     if (activeId === id) setActiveId(next[0]?.id ?? null)
   }
 
+  // ── Pubblica nel catalogo: l'AI compila la scheda dalla perizia, l'admin controlla e conferma ──
+  const hasValidPerizia = !!activeItem && activeItem.chat.some(m => m.role === 'ai' && m.text && !m.text.startsWith('⚠'))
+  const startPublish = async () => {
+    if (!activeItem || !activeSrc || !hasValidPerizia) return
+    const itemId = activeItem.id
+    if (activeItem.catalogId && catalog.some(c => c.id === activeItem.catalogId) && !confirm('Questa foto è già nel catalogo. Vuoi crearne un\'altra scheda?')) return
+    setPubDraft({ itemId, busy: true, f: {} })
+    try {
+      const hist = activeItem.chat.filter(m => !m.text.startsWith('⚠'))
+        .map(m => `${m.role === 'user' ? 'Admin' : 'Perito AI'}: ${m.text}`).join('\n\n').slice(-7000)
+      const parsed = await groqJson<any>(`Sei un esperto italiano di vintage e modernariato e scrivi le schede del catalogo di un negozio (Emporio 46, Firenze: arredi vintage e bijoux).
+Qui sotto trovi la perizia di un oggetto e la conversazione con l'amministratore. Se l'admin ha corretto qualcosa, vale la sua correzione.
+
+${hist}
+
+Compila la scheda catalogo. Rispondi SOLO con un JSON valido (niente altro testo) con questi campi:
+{
+  "nome": "titolo commerciale preciso in italiano, max 70 caratteri (es. 'Specchio da parete Art Déco con cornice in ottone')",
+  "nomeEn": "stesso titolo in inglese elegante",
+  "era": "periodo (es. 'Anni '30', 'Fine '800', 'Anni '60')",
+  "categoria": "una tra: mobili|lampade|bijoux|specchi|cornici|complementi|ceramiche|modernariato|altro",
+  "descrizione": "descrizione commerciale elegante di 2-3 frasi (max 280 caratteri) basata SOLO su ciò che emerge dalla perizia: materiali, stile, stato, dettagli. Non inventare marchi, firme o date non citati",
+  "descrizioneEn": "la stessa descrizione in inglese elegante",
+  "badge": "etichetta breve (es. 'Disponibile', 'Pezzo raro', 'Ottimo stato')",
+  "prezzo": "prezzo di vendita in formato '€ 450' oppure fascia '€ 400 – € 600' ricavato dalla stima della perizia; 'Su richiesta' se la perizia non lo permette"
+}`, 1200)
+      setPubDraft({
+        itemId, busy: false,
+        f: {
+          nome: String(parsed.nome || '').trim() || activeItem.name.replace(/\.[^.]+$/, ''),
+          nomeEn: String(parsed.nomeEn || '').trim(),
+          era: String(parsed.era || '').trim(),
+          categoria: normCat(parsed.categoria, 'altro'),
+          descrizione: String(parsed.descrizione || '').trim(),
+          descrizioneEn: String(parsed.descrizioneEn || '').trim(),
+          badge: String(parsed.badge || '').trim() || 'Disponibile',
+          prezzo: String(parsed.prezzo || '').trim() || 'Su richiesta',
+          stato: 'disponibile',
+        },
+      })
+    } catch (e) {
+      setPubDraft(null)
+      showToast(aiErr(e))
+    }
+  }
+
+  const confirmPublish = () => {
+    if (!pubDraft || pubDraft.busy) return
+    const src = srcs[pubDraft.itemId]
+    const f = pubDraft.f
+    if (!src) { showToast('⚠ Immagine non in memoria: ricarica il file'); return }
+    if (!String(f.nome || '').trim()) { showToast('⚠ Serve almeno il titolo'); return }
+    const id = Date.now()
+    const newItem: CatalogItem = {
+      id, nome: String(f.nome).trim(), nomeEn: String(f.nomeEn || '').trim() || undefined,
+      era: String(f.era || '').trim(), categoria: f.categoria || 'altro',
+      descrizione: String(f.descrizione || '').trim(), descrizioneEn: String(f.descrizioneEn || '').trim() || undefined,
+      prezzo: String(f.prezzo || '').trim() || 'Su richiesta', stato: f.stato || 'disponibile',
+      badge: String(f.badge || '').trim() || 'Disponibile', img: src, images: [src], visibile: f.visibile !== false,
+    }
+    setCatalog([...catalog, newItem])
+    persist(items.map(it => it.id === pubDraft.itemId ? { ...it, catalogId: id } : it))
+    setPubDraft(null)
+    showToast(newItem.visibile ? '✦ Pubblicato nel catalogo ✓ — è già visibile sulla landing' : '✦ Salvato nel catalogo come bozza (nascosto) ✓')
+  }
+  const setDraft = (k: string, v: any) => setPubDraft(d => d ? { ...d, f: { ...d.f, [k]: v } } : d)
+
   const reanalyze = () => {
     if (!activeItem || !activeSrc) return
     analyzeImage(activeItem.id, activeSrc, items)
@@ -1839,6 +1911,11 @@ Rispondi in modo preciso e professionale, tenendo conto delle correzioni o infor
             {activeSrc && (
               <button onClick={reanalyze} disabled={loading} style={{ ...btnGhost, fontSize: '0.44rem', padding: '0.4rem 0.8rem', color: '#c9a84c', borderColor: 'rgba(201,168,76,0.3)', opacity: loading ? 0.5 : 1 }}>
                 ↺ Ri-analizza da capo
+              </button>
+            )}
+            {activeSrc && hasValidPerizia && !loading && (
+              <button onClick={startPublish} disabled={!!pubDraft} style={{ ...btnGold, fontSize: '0.46rem', padding: '0.55rem 0.8rem', opacity: pubDraft ? 0.5 : 1 }}>
+                {activeItem.catalogId && catalog.some(c => c.id === activeItem.catalogId) ? '✓ Nel catalogo · crea un\'altra scheda' : '📦 Pubblica nel catalogo'}
               </button>
             )}
           </div>
@@ -1934,6 +2011,63 @@ Rispondi in modo preciso e professionale, tenendo conto delle correzioni o infor
             <button onClick={() => inputRef.current?.click()} style={{ ...btnGold, marginTop: '1.5rem' }}>+ Carica prima immagine</button>
           </div>
         </div>
+      )}
+
+      {/* ── Pubblica nel catalogo: scheda compilata dall'AI, modificabile prima di confermare ── */}
+      {pubDraft && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(5,3,2,0.86)', display: 'flex', alignItems: isMobile ? 'flex-start' : 'center', justifyContent: 'center', padding: isMobile ? 0 : '1.5rem', overflowY: 'auto' }}>
+          <div style={{ width: '100%', maxWidth: 760, background: '#120d08', border: '1px solid rgba(201,168,76,0.3)', padding: isMobile ? '1.1rem' : '1.6rem', margin: 'auto' }}>
+            <p style={{ fontFamily: 'Cinzel, serif', fontSize: '0.55rem', letterSpacing: '0.2em', color: '#c9a84c', marginBottom: '0.4rem' }}>📦 PUBBLICA NEL CATALOGO</p>
+            {pubDraft.busy ? (
+              <div style={{ textAlign: 'center', padding: '2.5rem 0' }}>
+                <p style={{ fontFamily: 'Cormorant Garamond, serif', color: '#6fcf97', fontSize: '1rem', fontStyle: 'italic' }}>✦ L'AI sta compilando la scheda dalla perizia…</p>
+              </div>
+            ) : (
+              <>
+                <p style={{ fontFamily: 'Cormorant Garamond, serif', color: '#9a8a78', fontSize: '0.88rem', fontStyle: 'italic', marginBottom: '1rem' }}>
+                  Scheda compilata dall'AI: controlla e correggi quello che vuoi, soprattutto il prezzo (è una stima). Poi conferma.
+                </p>
+                <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '1rem' }}>
+                  <img src={srcs[pubDraft.itemId]} alt="" style={{ width: isMobile ? '100%' : 200, maxHeight: isMobile ? 220 : 260, objectFit: 'contain', background: '#0a0805', border: '1px solid rgba(201,168,76,0.2)', alignSelf: 'flex-start' }} />
+                  <div style={{ flex: 1, display: 'grid', gap: '0.7rem', minWidth: 0 }}>
+                    <div><label style={labelStyle}>Titolo</label><input style={inputStyle} value={pubDraft.f.nome || ''} onChange={e => setDraft('nome', e.target.value)} /></div>
+                    <div><label style={labelStyle}>Title (EN)</label><input style={inputStyle} value={pubDraft.f.nomeEn || ''} onChange={e => setDraft('nomeEn', e.target.value)} /></div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.7rem' }}>
+                      <div><label style={labelStyle}>Epoca</label><input style={inputStyle} value={pubDraft.f.era || ''} onChange={e => setDraft('era', e.target.value)} /></div>
+                      <div><label style={labelStyle}>Prezzo</label><input style={inputStyle} value={pubDraft.f.prezzo || ''} onChange={e => setDraft('prezzo', e.target.value)} /></div>
+                      <div><label style={labelStyle}>Categoria</label>
+                        <select style={inputStyle} value={pubDraft.f.categoria || 'altro'} onChange={e => setDraft('categoria', e.target.value)}>
+                          {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </div>
+                      <div><label style={labelStyle}>Stato</label>
+                        <select style={inputStyle} value={pubDraft.f.stato || 'disponibile'} onChange={e => setDraft('stato', e.target.value)}>
+                          {STATI.map(c => <option key={c} value={c}>{c.replace('_', ' ')}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <div><label style={labelStyle}>Badge etichetta</label><input style={inputStyle} value={pubDraft.f.badge || ''} onChange={e => setDraft('badge', e.target.value)} /></div>
+                    <div><label style={labelStyle}>Descrizione</label><textarea rows={4} style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }} value={pubDraft.f.descrizione || ''} onChange={e => setDraft('descrizione', e.target.value)} /></div>
+                    <div><label style={labelStyle}>Description (EN)</label><textarea rows={3} style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }} value={pubDraft.f.descrizioneEn || ''} onChange={e => setDraft('descrizioneEn', e.target.value)} /></div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: 'Cormorant Garamond, serif', color: '#e8dcc8', fontSize: '0.9rem', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={pubDraft.f.visibile !== false} onChange={e => setDraft('visibile', e.target.checked)} />
+                      Visibile subito sulla landing (togli la spunta per salvarlo come bozza nascosta)
+                    </label>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '0.7rem', marginTop: '1.2rem', flexWrap: 'wrap' }}>
+                  <button onClick={confirmPublish} style={{ ...btnGold, padding: '0.7rem 1.4rem' }}>✦ Pubblica nel catalogo</button>
+                  <button onClick={startPublish} style={{ ...btnGhost, color: '#6fcf97', borderColor: 'rgba(111,207,151,0.3)' }}>↺ Rigenera con AI</button>
+                  <button onClick={() => setPubDraft(null)} style={btnGhost}>Annulla</button>
+                </div>
+              </>
+            )}
+            {pubDraft.busy && <div style={{ textAlign: 'center' }}><button onClick={() => setPubDraft(null)} style={btnGhost}>Annulla</button></div>}
+          </div>
+        </div>
+      )}
+      {toast && (
+        <div style={{ position: 'fixed', left: '50%', bottom: 24, transform: 'translateX(-50%)', zIndex: 10001, background: toast.startsWith('⚠') ? '#3a1410' : '#10281c', border: `1px solid ${toast.startsWith('⚠') ? '#eb5757' : '#6fcf97'}`, color: '#f5ede0', padding: '0.7rem 1.1rem', fontFamily: 'Cormorant Garamond, serif', fontSize: '0.95rem', maxWidth: '92vw' }}>{toast}</div>
       )}
 
       {/* Stile animazione bounce per i dot di loading */}

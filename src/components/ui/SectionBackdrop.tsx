@@ -93,8 +93,8 @@ export function BgMedia({ bg, slot, style, fill }: { bg: SectionBg; slot?: Secti
         key={bg.video}
         src={bg.video}
         poster={bg.poster || undefined}
-        autoPlay muted loop playsInline
-        preload={slot === 'hero' || slot === 'menu' ? 'auto' : 'metadata'}
+        autoPlay={slot === 'hero'} muted loop playsInline
+        preload={slot === 'hero' ? 'auto' : 'none'}
         disablePictureInPicture
         aria-hidden="true"
         data-bg-slot={slot}

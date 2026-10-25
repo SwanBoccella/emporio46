@@ -512,3 +512,28 @@ Tutti i diritti riservati.
 
 ### Chiave Groq in produzione (aggiornamento v57.1)
 La chiave **non deve mai avere il prefisso `VITE_`** (finirebbe nel bundle pubblico). Su Netlify imposta `GROQ_API_KEY` (segreta): la Function `netlify/functions/groq-proxy.mjs` la usa lato server e risponde solo a chi ha fatto login admin. In locale (`npm run dev`) la chiave sta in `.env.local` come `VITE_GROQ_DEV_KEY` (solo dev, eliminata dalla build: controlla con `grep -r gsk_ dist`). Nota: le Function sincrone Netlify hanno un timeout di ~10 s; se un'analisi foto lunga va in timeout, riprova o inserisci una chiave diretta nel pannello.
+
+**Perizia AI → catalogo**: dopo un'analisi, il pulsante «📦 Pubblica nel catalogo» (Admin → Perizia AI) fa compilare all'AI la scheda (titolo IT/EN, epoca, categoria, descrizione IT/EN, badge, prezzo stimato) a partire dalla perizia e dalla chat con l'admin; un pannello permette di correggerla e di pubblicarla subito (o salvarla come bozza nascosta). La foto analizzata diventa l'immagine dell'oggetto.
+
+
+## Risparmio crediti Netlify (v64)
+
+- `site-data` resta nella CDN 15 min (+24 h stale-while-revalidate); `admin-api` svuota la cache a ogni salvataggio (tag `site-data`), quindi le modifiche admin sono immediate.
+- `asset` (immagini/modello 3D caricati dall'admin) è cacheato dalla CDN: la Function non riparte a ogni richiesta.
+- `public/_headers`: cache di 30 giorni per `/bg`, `/catalog`, `/models`, logo e favicon. Per sostituire un file con lo stesso nome, cambiargli nome.
+- Video di sfondo: solo l'hero si scarica subito; menu e footer partono solo quando servono. `footer-video.mp4` ricompresso (3,9 → 1,8 MB), tutti i video con `faststart`.
+- `netlify.toml`: nessun deploy se cambiano solo README, tests, emailjs-templates, LICENSE o .env.example.
+
+
+## SEO e pubblicazione (v65)
+
+`npm run build` esegue anche `scripts/generate-seo.mjs`, che crea in `dist/`:
+
+- `sitemap.xml` (home + foto del catalogo) e `robots.txt` con il dominio corretto;
+- nel `index.html`: `canonical`, `og:url`, `og:image`, `twitter:image`, link al manifest e un testo `<noscript>` con indirizzo e orari (letto da chi non esegue JavaScript).
+
+Nei deploy che non sono produzione (anteprime, branch) `robots.txt` blocca tutto e viene aggiunto `X-Robots-Tag: noindex`.
+Anche `public/og-image.jpg` (anteprima social 1200×630) e `public/manifest.webmanifest` sono nuovi.
+
+**Dopo aver collegato il dominio:** su Netlify aggiungi la variabile `SITE_URL` (es. `https://www.tuodominio.it`, senza `/` finale) e rifai il deploy; poi in Google Search Console aggiungi la proprietà e invia `https://tuodominio.it/sitemap.xml`.
+Se cambi l'indirizzo o gli orari dal pannello admin, ricordati di allinearli anche nel blocco JSON-LD e nel `<noscript>` (`index.html` e `scripts/generate-seo.mjs`).

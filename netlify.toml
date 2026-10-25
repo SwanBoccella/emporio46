@@ -1,6 +1,9 @@
 [build]
   command = "npm run build"
   publish = "dist"
+  # Risparmio crediti: nessun nuovo deploy se cambiano solo documentazione, test o template email
+  # (exit 0 = salta la build; se git non riesce a confrontare, la build parte normalmente)
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- . ':(exclude)README.md' ':(exclude)LICENSE' ':(exclude)tests' ':(exclude)emailjs-templates' ':(exclude).env.example'"
 
 [build.environment]
   NODE_VERSION = "20"

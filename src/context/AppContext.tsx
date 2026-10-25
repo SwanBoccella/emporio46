@@ -532,7 +532,7 @@ export const DEFAULT_SEO: SeoData = {
   ogImage: '',
   keywords: 'arredi vintage Firenze, mobili vintage Firenze, bijoux vintage Firenze, lampade vintage, modernariato Firenze, Emporio 46',
   robots: 'index, follow',
-  canonical: typeof window !== 'undefined' ? window.location.origin : '',
+  canonical: typeof window !== 'undefined' ? `${window.location.origin}/` : '',
   schemaType: 'FurnitureStore',
   schemaName: 'Emporio 46',
   schemaAddress: 'Via Giampaolo Orsini, 46/A, 50126 Firenze FI',

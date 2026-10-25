@@ -124,7 +124,13 @@ export default async (req) => {
     // Scrive su Netlify Database + Netlify Blobs (+ copia sul Gist se configurato)
     const res = await writeSite(content, rev)
     if (!res.ok) return json(502, { error: 'store_write', message: 'Salvataggio non riuscito su Netlify Database/Blobs. ' + res.failed.map(f => `${f.store}: ${f.error}`).join('; ') })
-    return json(200, { ok: true, rev, stores: res.written, warnings: res.failed })
+    // Svuota la cache CDN di site-data così i visitatori vedono subito le modifiche (se fallisce, scade da sola in max 15 min)
+    const warnings = [...res.failed]
+    try {
+      const { purgeCache } = await import('@netlify/functions')
+      await purgeCache({ tags: ['site-data'] })
+    } catch (e) { warnings.push({ store: 'cache', error: 'purge_failed: ' + String(e?.message || e) }) }
+    return json(200, { ok: true, rev, stores: res.written, warnings })
   }
 
   return json(400, { error: 'unknown_action' })

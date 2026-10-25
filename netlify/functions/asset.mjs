@@ -18,6 +18,7 @@ export default async (req) => {
     return new Response(buf, { status: 200, headers: {
       'content-type': meta.mime,
       'cache-control': 'public, max-age=31536000, immutable',
+      'netlify-cdn-cache-control': 'public, max-age=31536000, immutable, durable',   // la CDN la tiene: la Function non riparte
       'x-content-type-options': 'nosniff',
       'x-asset-parts': String(meta.total),
     } })
@@ -58,6 +59,7 @@ async function serveVideo(req, store, id, meta) {
     'cache-control': 'public, max-age=31536000, immutable',
     'x-content-type-options': 'nosniff',
   }
+  if (!ranged) headers['netlify-cdn-cache-control'] = 'public, max-age=31536000, immutable, durable'
   if (ranged) headers['content-range'] = `bytes ${start}-${end}/${size}`
   return new Response(body, { status: ranged ? 206 : 200, headers })
 }
