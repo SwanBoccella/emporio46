@@ -16,11 +16,17 @@ export default async (req) => {
   const site = req.headers.get('sec-fetch-site')
   if (site && site !== 'same-origin' && site !== 'none') return err(403, 'forbidden', 'Richiesta non consentita.')
 
-  const KEY = process.env.GROQ_API_KEY
-  if (!KEY || !process.env.ADMIN_PASSWORD) return err(500, 'not_configured', 'Mancano GROQ_API_KEY o ADMIN_PASSWORD nelle variabili Netlify.')
+  // Messaggi distinti: dicono ESATTAMENTE quale variabile il server non vede (le variabili si leggono solo dopo un nuovo deploy,
+  // e devono avere l'ambito "Functions" attivo su Netlify).
+  const KEY = (process.env.GROQ_API_KEY || '').trim()
+  if (!KEY) return err(500, 'not_configured', 'Il server non vede GROQ_API_KEY. Su Netlify controlla che sia nelle Environment variables con ambito "Functions" (e senza prefisso VITE_), poi fai un nuovo deploy.')
+
+  // La password admin può stare in ADMIN_PASSWORD oppure (se cambiata dal pannello) nell'archivio privato: basta una delle due.
+  const stored = await readStored()
+  if (!stored && !process.env.ADMIN_PASSWORD) return err(500, 'not_configured', 'Il server non vede né ADMIN_PASSWORD né una password salvata dal pannello. Controlla le variabili Netlify e rifai il deploy.')
 
   const bearer = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '')
-  if (!checkToken(bearer, await readStored())) return err(401, 'session_expired', 'Sessione admin non valida o scaduta.')
+  if (!checkToken(bearer, stored)) return err(401, 'session_expired', 'Sessione admin non valida o scaduta: esci e rientra dal pannello.')
 
   const raw = await req.text()
   if (raw.length > MAX_BYTES) return err(413, 'too_large', 'Richiesta troppo grande.')

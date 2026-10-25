@@ -248,8 +248,8 @@ export default function Navbar({ onOpenLegal, bannerActive }: { onOpenLegal?: (t
       {isAdmin && (
         <motion.button
           onClick={() => scrollTo('admin')}
-          className="fixed bottom-6 left-6 z-[1999]"
-          style={{ borderRadius: 999, fontFamily: 'var(--font-label)', fontSize: '0.66rem', letterSpacing: '0.14em', textTransform: 'uppercase', padding: '0.55rem 1.1rem', background: '#8b3a2a', color: '#f8efe2', border: '1px solid rgba(var(--color-primary-rgb), 0.2)', cursor: 'pointer' }}
+          className="fixed bottom-6 left-1/2 z-[1999]"
+          style={{ borderRadius: 999, fontFamily: 'var(--font-label)', fontSize: '0.66rem', letterSpacing: '0.14em', textTransform: 'uppercase', padding: '0.55rem 1.1rem', background: '#8b3a2a', color: '#f8efe2', border: '1px solid rgba(var(--color-primary-rgb), 0.2)', cursor: 'pointer', x: '-50%' }}
           initial={{ scale: 0, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ delay: 2.8, type: 'spring', stiffness: 200 }}

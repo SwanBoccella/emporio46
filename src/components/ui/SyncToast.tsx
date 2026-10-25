@@ -26,7 +26,7 @@ export default function SyncToast() {
     <div role={ok || busy ? 'status' : 'alert'} aria-live={ok || busy ? 'polite' : 'assertive'}
       style={{
         position: 'fixed', left: '50%', transform: 'translateX(-50%)',
-        bottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)', zIndex: 2147483000,
+        bottom: 'calc(env(safe-area-inset-bottom, 0px) + 76px)', zIndex: 2147483000,
         width: 'min(460px, calc(100vw - 24px))', boxSizing: 'border-box',
         background: bg, color: '#f5ede0', border: `1px solid ${color}`, borderLeft: `4px solid ${color}`,
         borderRadius: 10, padding: '0.7rem 0.9rem', boxShadow: '0 12px 40px rgba(0,0,0,0.55)',
