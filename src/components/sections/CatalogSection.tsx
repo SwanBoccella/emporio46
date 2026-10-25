@@ -7,6 +7,7 @@ import type { CatalogItem } from '../../types'
 import { waItemLink } from '../../utils/whatsapp'
 import { safeHref } from '../../utils/safeUrl'
 import { REVEAL_VP } from '../../utils/reveal'
+import { pushBackLayer } from '../../utils/backLayer'
 
 const ICONS: Record<string, string> = {
   mobili: '🪑', lampade: '💡', bijoux: '📿', specchi: '🪞', cornici: '🖼',
@@ -161,6 +162,11 @@ function ItemModal({ item, onClose, t, onOpenLightbox }: { item: CatalogItem; on
   const touchStartY = useRef<number | null>(null)
 
   const allImages = item.images && item.images.length > 0 ? item.images : (item.img ? [item.img] : [])
+
+  // "Indietro" del telefono: chiude la scheda (dopo aver chiuso l'eventuale foto ingrandita) senza uscire dal sito
+  const closeRef = useRef(onClose)
+  closeRef.current = onClose
+  useEffect(() => pushBackLayer(() => closeRef.current()), [])
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -340,17 +346,10 @@ function StandaloneLightbox({ images, startIdx, onClose }: { images: string[]; s
   const touchStartX = useRef<number | null>(null)
   const touchStartY = useRef<number | null>(null)
 
-  // Tasto/gesto "indietro" del telefono: chiude solo la foto ingrandita (e non la scheda o il sito)
-  const pushed = useRef(false)
-  useEffect(() => {
-    try { history.pushState({ lb: 1 }, ''); pushed.current = true } catch { /* noop */ }
-    const onPop = () => { pushed.current = false; onClose() }
-    window.addEventListener('popstate', onPop)
-    return () => {
-      window.removeEventListener('popstate', onPop)
-      if (pushed.current) { pushed.current = false; try { history.back() } catch { /* noop */ } }
-    }
-  }, [])
+  // Tasto/gesto "indietro" del telefono: chiude solo la foto ingrandita, la scheda dell'articolo resta aperta
+  const closeRef = useRef(onClose)
+  closeRef.current = onClose
+  useEffect(() => pushBackLayer(() => closeRef.current()), [])
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {

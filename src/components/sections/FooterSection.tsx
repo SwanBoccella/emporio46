@@ -5,6 +5,7 @@ import { useApp } from '../../context/AppContext'
 import { safeHref } from '../../utils/safeUrl'
 import SectionBackdrop from '../ui/SectionBackdrop'
 import { REVEAL_VP } from '../../utils/reveal'
+import { footerGlassStyle } from '../../utils/footerGlass'
 
 export default function FooterSection({ onOpenLegal }: { onOpenLegal?: (tab: string) => void }) {
   const { t, lang, settings, settingsEn, reviews, isAdmin } = useApp()
@@ -32,11 +33,7 @@ export default function FooterSection({ onOpenLegal }: { onOpenLegal?: (tab: str
   ]
 
   // Ogni gruppo di testo ha il suo riquadro semitrasparente (il video si vede attraverso, il testo resta leggibile grazie a blur e alone), ma tra un riquadro e l'altro lo sfondo resta visibile
-  const gA = Math.round(Math.max(0, Math.min(1, settings.footerGlass ?? 0.56)) * 100)
-  const gB = Math.max(0, Math.min(24, settings.footerGlassBlur ?? 7))
-  const gBd = Math.max(0, Math.min(1, settings.footerGlassBorder ?? 0.3))
-  const gBlur = gB > 0 ? `blur(${gB}px) saturate(1.1)` : 'none'
-  const glass: React.CSSProperties = { background: `color-mix(in srgb, var(--color-bg-card) ${gA}%, transparent)`, backdropFilter: gBlur, WebkitBackdropFilter: gBlur, textShadow: '0 0 8px rgba(var(--text-halo-rgb, 255,255,255), 0.85), 0 0 18px rgba(var(--text-halo-rgb, 255,255,255), 0.6)', border: `1px solid rgba(var(--color-primary-rgb), ${gBd})`, borderRadius: 24, boxShadow: gA < 8 ? 'none' : '0 14px 40px rgba(0,0,0,0.22)', padding: 'clamp(1.4rem,3.5vw,2.2rem) clamp(1.3rem,3.5vw,2.2rem)' }
+  const glass: React.CSSProperties = footerGlassStyle(settings)
 
   const ease = [0.16, 1, 0.3, 1] as [number, number, number, number]
 
@@ -47,10 +44,10 @@ export default function FooterSection({ onOpenLegal }: { onOpenLegal?: (tab: str
       <SectionBackdrop slot="footer" />
 
       {/* Velo leggero: la leggibilità non dipende dal video, il testo sta nel pannello opaco qui sotto */}
-      <div aria-hidden="true" style={{ position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none', background: 'linear-gradient(to bottom, rgba(8,5,3,0.12) 0%, rgba(8,5,3,0.04) 50%, rgba(8,5,3,0.18) 100%)' }} />
+      <div aria-hidden="true" style={{ position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none', background: 'linear-gradient(to bottom, rgba(8,5,3,0.03) 0%, rgba(8,5,3,0) 50%, rgba(8,5,3,0.08) 100%)' }} />
 
       {/* Gold bottom glow */}
-      <div style={{ position: 'absolute', inset: 0, zIndex: 2, background: 'radial-gradient(ellipse 80% 45% at 50% 105%, rgba(150,90,15,0.2) 0%, transparent 65%)' }} />
+      <div style={{ position: 'absolute', inset: 0, zIndex: 2, background: 'radial-gradient(ellipse 80% 45% at 50% 105%, rgba(150,90,15,0.1) 0%, transparent 65%)' }} />
 
       {/* Diagonal mesh */}
       <div style={{

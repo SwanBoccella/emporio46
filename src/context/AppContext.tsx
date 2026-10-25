@@ -6,25 +6,68 @@ import type { CatalogItem, Recensione } from '../types'
 import { translations } from '../i18n/translations'
 
 // ─── Catalog & Reviews defaults ───────────────────────────────────────────────
-// Articoli iniziali (dal catalogo WhatsApp). Prezzi "Su richiesta" finché non li imposti da admin → Catalogo.
+// Articoli iniziali (dal catalogo WhatsApp). I prezzi sono stime di partenza: modificali da admin → Catalogo (visibili ai visitatori solo con "Mostra prezzi" attivo).
 const CATALOG_DEFAULT: CatalogItem[] = [
-  { id: 101, nome: "Borsa alta moda anni '70", nomeEn: "Handbag, high-fashion 1970s", era: "Anni '70", categoria: "modernariato", descrizione: "Borsa alta moda anni '70, made in Italy.", descrizioneEn: "High-fashion 1970s handbag, made in Italy.", prezzo: 'Su richiesta', stato: 'venduto', badge: 'Venduto', img: '/catalog/01-borsa-anni-70.jpg', images: ['/catalog/01-borsa-anni-70.jpg'], visibile: true },
-  { id: 102, nome: "Mobile bar anni '50", nomeEn: "1950s bar cabinet", era: "Anni '50", categoria: "mobili", descrizione: "Mobile bar anni '50 completamente originale.", descrizioneEn: "1950s bar cabinet, completely original.", prezzo: 'Su richiesta', stato: 'disponibile', badge: 'Disponibile', img: '/catalog/02-mobile-bar-anni-50.jpg', images: ['/catalog/02-mobile-bar-anni-50.jpg'], visibile: true },
-  { id: 103, nome: "Targa in vetro anni '50", nomeEn: "1950s glass sign", era: "Anni '40/'50", categoria: "complementi", descrizione: "Bellissima targa in vetro originale degli anni '40/'50.", descrizioneEn: "Beautiful original glass sign from the 1940s/50s.", prezzo: 'Su richiesta', stato: 'disponibile', badge: 'Disponibile', img: '/catalog/03-targa-vetro-anni-50.jpg', images: ['/catalog/03-targa-vetro-anni-50.jpg'], visibile: true },
-  { id: 104, nome: "Carta geografica Francia politica", nomeEn: "Political map of France", era: "Vintage", categoria: "complementi", descrizione: "Carta didattica della Francia politica, d'epoca.", descrizioneEn: "Vintage educational political map of France.", prezzo: 'Su richiesta', stato: 'disponibile', badge: 'Disponibile', img: '/catalog/04-carta-francia.jpg', images: ['/catalog/04-carta-francia.jpg'], visibile: true },
-  { id: 105, nome: "Mobile in bambù", nomeEn: "Bamboo cabinet", era: "Vintage", categoria: "mobili", descrizione: "Mobile originale in bambù con due cassetti.", descrizioneEn: "Original bamboo cabinet with two drawers.", prezzo: 'Su richiesta', stato: 'venduto', badge: 'Venduto', img: '/catalog/05-mobile-bambu.jpg', images: ['/catalog/05-mobile-bambu.jpg'], visibile: true },
-  { id: 106, nome: "Sedie tipo Cesca", nomeEn: "Cesca-style chairs", era: "Vintage", categoria: "mobili", descrizione: "Sedie in paglia di Vienna e acciaio, originali.", descrizioneEn: "Original Vienna straw and steel chairs.", prezzo: 'Su richiesta', stato: 'venduto', badge: 'Venduto', img: '/catalog/06-sedie-cesca.jpg', images: ['/catalog/06-sedie-cesca.jpg'], visibile: true },
-  { id: 107, nome: "Lampadario a sospensione arancio", nomeEn: "Orange pendant lamp", era: "Vintage", categoria: "lampade", descrizione: "Lampada a sospensione arancio con due sfere bianche.", descrizioneEn: "Orange pendant lamp with two white globes.", prezzo: 'Su richiesta', stato: 'venduto', badge: 'Venduto', img: '/catalog/07-lampadario-arancio.jpg', images: ['/catalog/07-lampadario-arancio.jpg'], visibile: true },
-  { id: 108, nome: "Scatola in ceramica Rometti", nomeEn: "Rometti ceramic box", era: "Vintage", categoria: "ceramiche", descrizione: "Scatola in ceramica Rometti, porta-carte da gioco.", descrizioneEn: "Rometti ceramic playing-card box.", prezzo: 'Su richiesta', stato: 'venduto', badge: 'Venduto', img: '/catalog/08-scatola-rometti.jpg', images: ['/catalog/08-scatola-rometti.jpg'], visibile: true },
-  { id: 109, nome: "Portariviste", nomeEn: "Magazine rack", era: "Vintage", categoria: "complementi", descrizione: "Portariviste in legno con bordatura in ottone.", descrizioneEn: "Wooden magazine rack with brass trim.", prezzo: 'Su richiesta', stato: 'disponibile', badge: 'Disponibile', img: '/catalog/09-portariviste.jpg', images: ['/catalog/09-portariviste.jpg'], visibile: true },
-  { id: 110, nome: "Valigia / baule", nomeEn: "Suitcase / trunk", era: "Vintage", categoria: "complementi", descrizione: "Valigia/baule in cartone e ferro dei primi anni del secolo.", descrizioneEn: "Cardboard and iron suitcase/trunk from the early 20th century.", prezzo: 'Su richiesta', stato: 'disponibile', badge: 'Disponibile', img: '/catalog/10-valigia-baule.jpg', images: ['/catalog/10-valigia-baule.jpg'], visibile: true },
-  { id: 111, nome: "Poltrona anni '50/'60", nomeEn: "1950s/60s armchair", era: "Anni '50/'60", categoria: "mobili", descrizione: "Poltrona in similpelle beige con zampe in legno.", descrizioneEn: "Beige faux-leather armchair with wooden legs.", prezzo: 'Su richiesta', stato: 'disponibile', badge: 'Disponibile', img: '/catalog/11-poltrona-50-60.jpg', images: ['/catalog/11-poltrona-50-60.jpg'], visibile: true },
-  { id: 112, nome: "Lampada Dalù", nomeEn: "Dalù lamp", era: "Vintage", categoria: "lampade", descrizione: "Lampada da tavolo Dalù di Vico Magistretti.", descrizioneEn: "Dalù table lamp by Vico Magistretti.", prezzo: 'Su richiesta', stato: 'disponibile', badge: 'Disponibile', img: '/catalog/12-lampada-dalu.jpg', images: ['/catalog/12-lampada-dalu.jpg'], visibile: true },
-  { id: 113, nome: "Lampada da tavolo in paglia di Vienna", nomeEn: "Vienna straw table lamp", era: "Vintage", categoria: "lampade", descrizione: "Lampada da tavolo in paglia di Vienna e bambù.", descrizioneEn: "Table lamp in Vienna straw and bamboo.", prezzo: 'Su richiesta', stato: 'disponibile', badge: 'Disponibile', img: '/catalog/13-lampada-paglia.jpg', images: ['/catalog/13-lampada-paglia.jpg'], visibile: true },
-  { id: 114, nome: "Tavolino anni '50", nomeEn: "1950s side table", era: "Anni '50", categoria: "mobili", descrizione: "Tavolino in legno bordato in corda.", descrizioneEn: "Wooden side table edged with rope.", prezzo: 'Su richiesta', stato: 'disponibile', badge: 'Disponibile', img: '/catalog/14-tavolino-anni-50.jpg', images: ['/catalog/14-tavolino-anni-50.jpg'], visibile: true },
-  { id: 115, nome: "Sedia girevole", nomeEn: "Swivel chair", era: "Vintage", categoria: "mobili", descrizione: "Sedia da lavoro girevole in legno e acciaio.", descrizioneEn: "Swivel work chair in wood and steel.", prezzo: 'Su richiesta', stato: 'disponibile', badge: 'Disponibile', img: '/catalog/15-sedia-girevole.jpg', images: ['/catalog/15-sedia-girevole.jpg'], visibile: true },
-  { id: 116, nome: "Coppia di lampade da tavolo", nomeEn: "Pair of table lamps", era: "Vintage", categoria: "lampade", descrizione: "Coppia di lampade da tavolo in bronzo e vetro.", descrizioneEn: "Pair of bronze and glass table lamps.", prezzo: 'Su richiesta', stato: 'disponibile', badge: 'Disponibile', img: '/catalog/16-lampade-bronzo.jpg', images: ['/catalog/16-lampade-bronzo.jpg'], visibile: true },
+  { id: 101, nome: "Borsa alta moda anni '70", nomeEn: "Handbag, high-fashion 1970s", era: "Anni '70", categoria: "modernariato", descrizione: "Borsa alta moda anni '70, made in Italy.", descrizioneEn: "High-fashion 1970s handbag, made in Italy.", prezzo: '€ 180', stato: 'venduto', badge: 'Venduto', img: '/catalog/01-borsa-anni-70.jpg', images: ['/catalog/01-borsa-anni-70.jpg'], visibile: true },
+  { id: 102, nome: "Mobile bar anni '50", nomeEn: "1950s bar cabinet", era: "Anni '50", categoria: "mobili", descrizione: "Mobile bar anni '50 completamente originale.", descrizioneEn: "1950s bar cabinet, completely original.", prezzo: '€ 650', stato: 'disponibile', badge: 'Disponibile', img: '/catalog/02-mobile-bar-anni-50.jpg', images: ['/catalog/02-mobile-bar-anni-50.jpg'], visibile: true },
+  { id: 103, nome: "Targa in vetro anni '50", nomeEn: "1950s glass sign", era: "Anni '40/'50", categoria: "complementi", descrizione: "Bellissima targa in vetro originale degli anni '40/'50.", descrizioneEn: "Beautiful original glass sign from the 1940s/50s.", prezzo: '€ 120', stato: 'disponibile', badge: 'Disponibile', img: '/catalog/03-targa-vetro-anni-50.jpg', images: ['/catalog/03-targa-vetro-anni-50.jpg'], visibile: true },
+  { id: 104, nome: "Carta geografica Francia politica", nomeEn: "Political map of France", era: "Vintage", categoria: "complementi", descrizione: "Carta didattica della Francia politica, d'epoca.", descrizioneEn: "Vintage educational political map of France.", prezzo: '€ 45', stato: 'disponibile', badge: 'Disponibile', img: '/catalog/04-carta-francia.jpg', images: ['/catalog/04-carta-francia.jpg'], visibile: true },
+  { id: 105, nome: "Mobile in bambù", nomeEn: "Bamboo cabinet", era: "Vintage", categoria: "mobili", descrizione: "Mobile originale in bambù con due cassetti.", descrizioneEn: "Original bamboo cabinet with two drawers.", prezzo: '€ 320', stato: 'venduto', badge: 'Venduto', img: '/catalog/05-mobile-bambu.jpg', images: ['/catalog/05-mobile-bambu.jpg'], visibile: true },
+  { id: 106, nome: "Sedie tipo Cesca", nomeEn: "Cesca-style chairs", era: "Vintage", categoria: "mobili", descrizione: "Sedie in paglia di Vienna e acciaio, originali.", descrizioneEn: "Original Vienna straw and steel chairs.", prezzo: '€ 480', stato: 'venduto', badge: 'Venduto', img: '/catalog/06-sedie-cesca.jpg', images: ['/catalog/06-sedie-cesca.jpg'], visibile: true },
+  { id: 107, nome: "Lampadario a sospensione arancio", nomeEn: "Orange pendant lamp", era: "Vintage", categoria: "lampade", descrizione: "Lampada a sospensione arancio con due sfere bianche.", descrizioneEn: "Orange pendant lamp with two white globes.", prezzo: '€ 190', stato: 'venduto', badge: 'Venduto', img: '/catalog/07-lampadario-arancio.jpg', images: ['/catalog/07-lampadario-arancio.jpg'], visibile: true },
+  { id: 108, nome: "Scatola in ceramica Rometti", nomeEn: "Rometti ceramic box", era: "Vintage", categoria: "ceramiche", descrizione: "Scatola in ceramica Rometti, porta-carte da gioco.", descrizioneEn: "Rometti ceramic playing-card box.", prezzo: '€ 85', stato: 'venduto', badge: 'Venduto', img: '/catalog/08-scatola-rometti.jpg', images: ['/catalog/08-scatola-rometti.jpg'], visibile: true },
+  { id: 109, nome: "Portariviste", nomeEn: "Magazine rack", era: "Vintage", categoria: "complementi", descrizione: "Portariviste in legno con bordatura in ottone.", descrizioneEn: "Wooden magazine rack with brass trim.", prezzo: '€ 70', stato: 'disponibile', badge: 'Disponibile', img: '/catalog/09-portariviste.jpg', images: ['/catalog/09-portariviste.jpg'], visibile: true },
+  { id: 110, nome: "Valigia / baule", nomeEn: "Suitcase / trunk", era: "Vintage", categoria: "complementi", descrizione: "Valigia/baule in cartone e ferro dei primi anni del secolo.", descrizioneEn: "Cardboard and iron suitcase/trunk from the early 20th century.", prezzo: '€ 95', stato: 'disponibile', badge: 'Disponibile', img: '/catalog/10-valigia-baule.jpg', images: ['/catalog/10-valigia-baule.jpg'], visibile: true },
+  { id: 111, nome: "Poltrona anni '50/'60", nomeEn: "1950s/60s armchair", era: "Anni '50/'60", categoria: "mobili", descrizione: "Poltrona in similpelle beige con zampe in legno.", descrizioneEn: "Beige faux-leather armchair with wooden legs.", prezzo: '€ 280', stato: 'disponibile', badge: 'Disponibile', img: '/catalog/11-poltrona-50-60.jpg', images: ['/catalog/11-poltrona-50-60.jpg'], visibile: true },
+  { id: 112, nome: "Lampada Dalù", nomeEn: "Dalù lamp", era: "Vintage", categoria: "lampade", descrizione: "Lampada da tavolo Dalù di Vico Magistretti.", descrizioneEn: "Dalù table lamp by Vico Magistretti.", prezzo: '€ 220', stato: 'disponibile', badge: 'Disponibile', img: '/catalog/12-lampada-dalu.jpg', images: ['/catalog/12-lampada-dalu.jpg'], visibile: true },
+  { id: 113, nome: "Lampada da tavolo in paglia di Vienna", nomeEn: "Vienna straw table lamp", era: "Vintage", categoria: "lampade", descrizione: "Lampada da tavolo in paglia di Vienna e bambù.", descrizioneEn: "Table lamp in Vienna straw and bamboo.", prezzo: '€ 130', stato: 'disponibile', badge: 'Disponibile', img: '/catalog/13-lampada-paglia.jpg', images: ['/catalog/13-lampada-paglia.jpg'], visibile: true },
+  { id: 114, nome: "Tavolino anni '50", nomeEn: "1950s side table", era: "Anni '50", categoria: "mobili", descrizione: "Tavolino in legno bordato in corda.", descrizioneEn: "Wooden side table edged with rope.", prezzo: '€ 160', stato: 'disponibile', badge: 'Disponibile', img: '/catalog/14-tavolino-anni-50.jpg', images: ['/catalog/14-tavolino-anni-50.jpg'], visibile: true },
+  { id: 115, nome: "Sedia girevole", nomeEn: "Swivel chair", era: "Vintage", categoria: "mobili", descrizione: "Sedia da lavoro girevole in legno e acciaio.", descrizioneEn: "Swivel work chair in wood and steel.", prezzo: '€ 110', stato: 'disponibile', badge: 'Disponibile', img: '/catalog/15-sedia-girevole.jpg', images: ['/catalog/15-sedia-girevole.jpg'], visibile: true },
+  { id: 116, nome: "Coppia di lampade da tavolo", nomeEn: "Pair of table lamps", era: "Vintage", categoria: "lampade", descrizione: "Coppia di lampade da tavolo in bronzo e vetro.", descrizioneEn: "Pair of bronze and glass table lamps.", prezzo: '€ 240', stato: 'disponibile', badge: 'Disponibile', img: '/catalog/16-lampade-bronzo.jpg', images: ['/catalog/16-lampade-bronzo.jpg'], visibile: true },
 ]
+
+// ─── Auto-compilazione una tantum dei campi vuoti (rev 1) ─────────────────────
+// Riempie SOLO ciò che è vuoto (o ancora "Su richiesta") negli articoli già salvati: prezzo di partenza per quelli
+// del catalogo iniziale, badge dallo stato, epoca, ecc. Non tocca mai valori già scritti. Si esegue una sola volta:
+// il segno "catalogSeedRev" viene salvato insieme alle impostazioni, così le modifiche successive restano come sono.
+const CATALOG_SEED_REV = 1
+const STATO_BADGE: Record<string, string> = { disponibile: 'Disponibile', in_vetrina: 'In vetrina', trattativa: 'In trattativa', venduto: 'Venduto' }
+const isBlank = (v: unknown) => v === undefined || v === null || (typeof v === 'string' && v.trim() === '')
+function fillCatalogGaps(cat: CatalogItem[]): CatalogItem[] {
+  const seed = new Map(CATALOG_DEFAULT.map(i => [i.id, i]))
+  return cat.map(item => {
+    const d = seed.get(item.id)
+    const out: any = { ...item }
+    if (isBlank(out.stato)) out.stato = 'disponibile'
+    if (isBlank(out.badge)) out.badge = STATO_BADGE[out.stato] || 'Disponibile'
+    if (isBlank(out.era)) out.era = d?.era || 'Vintage'
+    if (isBlank(out.categoria)) out.categoria = d?.categoria || 'altro'
+    if (d) {
+      if (isBlank(out.nomeEn)) out.nomeEn = d.nomeEn
+      if (isBlank(out.descrizioneEn)) out.descrizioneEn = d.descrizioneEn
+      if (isBlank(out.descrizione)) out.descrizione = d.descrizione
+    }
+    if (isBlank(out.prezzo) || out.prezzo === 'Su richiesta') out.prezzo = d && !isBlank(d.prezzo) ? d.prezzo : 'Su richiesta'
+    if (out.visibile === undefined) out.visibile = true
+    return out as CatalogItem
+  })
+}
+const seedDone = (st: any) => Number(st?.catalogSeedRev || 0) >= CATALOG_SEED_REV
+// Riquadri del footer: i valori di partenza vecchi (56% / sfocatura 7) coprivano quasi tutto il video.
+// Una tantum: se sono ancora quelli (mai toccati) passano ai nuovi, più trasparenti. Chi ha scelto altri valori non cambia.
+const footerGlassDone = (st: any) => Number(st?.footerGlassRev || 0) >= 1
+function migrateFooterGlass(st: any) {
+  const out = { ...st, footerGlassRev: 1 }
+  const untouched = (st.footerGlass === undefined && st.footerGlassBlur === undefined) || (st.footerGlass === 0.56 && st.footerGlassBlur === 7)
+  if (untouched) { out.footerGlass = 0.3; out.footerGlassBlur = 4 }
+  return out
+}
+// Impostazioni vuote che si possono ricavare dai dati: "Oggetti unici" = articoli in catalogo
+function fillSettingsGaps(st: any, count: number) {
+  const out = { ...st, catalogSeedRev: CATALOG_SEED_REV }
+  if (isBlank(out.statOggetti) && count > 0) out.statOggetti = String(count)
+  return out
+}
 // ⚠ SEGNAPOSTO: testi di esempio scritti per riempire la sezione. Sostituirli con recensioni reali dei clienti
 // (da admin → Recensioni) prima di pubblicare: presentare recensioni inventate come vere non è consentito.
 const REVIEWS_DEFAULT: Recensione[] = [
@@ -204,6 +247,7 @@ export interface SiteSettings {
   footerGlass?: number
   footerGlassBlur?: number
   footerGlassBorder?: number
+  footerGlassRev?: number   // migrazione dei riquadri del footer già eseguita (non toccare)
   logoUrl: string
   faviconUrl: string
   // Texts
@@ -284,6 +328,7 @@ export interface SiteSettings {
   statAnni: number
   statOggetti: string
   statRating: string
+  catalogSeedRev?: number   // auto-compilazione una tantum già eseguita (non toccare)
   // Why section items (optional override over translations)
   whyItems: { title: string; desc: string }[]
   // EmailJS configuration (managed via admin panel)
@@ -316,8 +361,8 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   footerTagline: 'Non smettere mai di sognare.',
   footerRights: '© 2026 Emporio 46 · Firenze',
   footerDesign: 'Design by Swan Boccella',
-  footerGlass: 0.56,
-  footerGlassBlur: 7,
+  footerGlass: 0.3,
+  footerGlassBlur: 4,
   footerGlassBorder: 0.3,
   logoUrl: '/logo.png',
   faviconUrl: '/favicon.png',
@@ -656,13 +701,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try { const s = localStorage.getItem('mnt_settings_en'); return s ? JSON.parse(s) : {} } catch { return {} }
   })
   const [isTranslatingEn, setIsTranslatingEn] = useState(false)
-  const [catalog, setCatalogRaw] = useState<CatalogItem[]>(() => { try { const s = localStorage.getItem('mnt_catalog'); const p = s ? JSON.parse(s) : null; return Array.isArray(p) && p.length ? p : CATALOG_DEFAULT } catch { return CATALOG_DEFAULT } })
+  const [catalog, setCatalogRaw] = useState<CatalogItem[]>(() => {
+    try {
+      const s = localStorage.getItem('mnt_catalog'); const p = s ? JSON.parse(s) : null
+      const base: CatalogItem[] = Array.isArray(p) && p.length ? p : CATALOG_DEFAULT
+      if (seedDone(load('mnt_settings', {}))) return base
+      const filled = fillCatalogGaps(base)          // una tantum: compila i campi vuoti (prezzi di partenza ecc.)
+      try { localStorage.setItem('mnt_catalog', JSON.stringify(filled)) } catch { /* noop */ }
+      return filled
+    } catch { return CATALOG_DEFAULT }
+  })
   const [reviews, setReviewsRaw] = useState<Recensione[]>(() => { try { const s = localStorage.getItem('mnt_reviews'); const p = s ? JSON.parse(s) : null; return Array.isArray(p) && p.length ? p : REVIEWS_DEFAULT } catch { return REVIEWS_DEFAULT } })
   const [isAdmin, setIsAdminRaw] = useState(false)
   const [contactTab, setContactTabRaw] = useState<ContactTab>('book')
   const [contactPrefill, setContactPrefill] = useState<ContactPrefill>({})
   const [settings, setSettings] = useState<SiteSettings>(() => {
-    const s = load('mnt_settings', DEFAULT_SETTINGS)
+    let s = load('mnt_settings', DEFAULT_SETTINGS)
     // Migrazione una tantum (v46): logo e sfondi nuovi sostituiscono i campi rimasti vuoti nei dati già salvati
     try { if (typeof s.footerDesign === 'string' && /err0r_hb/i.test(s.footerDesign)) s.footerDesign = s.footerDesign.replace(/err0r_hb/gi, 'Swan Boccella') } catch {}
     try {
@@ -675,6 +729,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('mnt_settings', JSON.stringify(s)); localStorage.setItem('mnt_assets_v46', '1')
       }
     } catch {}
+    try {
+      if (!footerGlassDone(s)) { s = migrateFooterGlass(s); localStorage.setItem('mnt_settings', JSON.stringify(s)) }
+    } catch { /* noop */ }
+    // Auto-compilazione una tantum dei campi vuoti (insieme al catalogo, vedi fillCatalogGaps)
+    try {
+      if (!seedDone(s)) {
+        let n = CATALOG_DEFAULT.length
+        try { const p = JSON.parse(localStorage.getItem('mnt_catalog') || 'null'); if (Array.isArray(p) && p.length) n = p.length } catch { /* noop */ }
+        s = fillSettingsGaps(s, n)
+        localStorage.setItem('mnt_settings', JSON.stringify(s))
+      }
+    } catch { /* noop */ }
     if (s.maintenanceMode && s.maintenanceEndDate) {
       const endTs = new Date(s.maintenanceEndDate).getTime()
       if (!isNaN(endTs) && Date.now() >= endTs) {
@@ -699,6 +765,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     fetchRemote().then(remote => {
       if (!remote) return
       revRef.current = remote.rev ?? null
+      const needSeed = !seedDone(remote.settings)   // dati salvati prima dell'auto-compilazione: si completano in memoria; si salvano al primo salvataggio dell'admin
       if (remote.settings) {
         setSettings(prev => {
           const merged = mergeRemoteSettings(prev, remote.settings as Partial<SiteSettings>)
@@ -714,9 +781,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
           return merged
         })
       }
-      if (remote.catalog && remote.catalog.length) {
-        setCatalogRaw(remote.catalog)
-        try { localStorage.setItem('mnt_catalog', JSON.stringify(remote.catalog)) } catch {}
+      const remoteCat: CatalogItem[] | null = remote.catalog && remote.catalog.length ? (needSeed ? fillCatalogGaps(remote.catalog) : remote.catalog) : null
+      if (remoteCat) {
+        setCatalogRaw(remoteCat)
+        try { localStorage.setItem('mnt_catalog', JSON.stringify(remoteCat)) } catch {}
+      }
+      if (!footerGlassDone(remote.settings)) {
+        setSettings(prev => {
+          const n = migrateFooterGlass(prev)
+          try { localStorage.setItem('mnt_settings', JSON.stringify(n)) } catch {}
+          return n
+        })
+      }
+      if (needSeed) {
+        setSettings(prev => {
+          const n = fillSettingsGaps(prev, remoteCat ? remoteCat.length : catalogRef.current.length)
+          try { localStorage.setItem('mnt_settings', JSON.stringify(n)) } catch {}
+          return n
+        })
       }
       if (remote.reviews && remote.reviews.length) {
         setReviewsRaw(remote.reviews)

@@ -247,7 +247,6 @@ function ScrollVelocityBar({ ready = true }: { ready?: boolean }) {
   return (
     <motion.div style={{ position: 'absolute', bottom: '5rem', left: 'clamp(1.5rem,4vw,4rem)', zIndex: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem' }}
       initial={{ opacity: 0, x: -16 }} animate={ready ? { opacity: 1, x: 0 } : {}} transition={{ delay: 1.9, duration: 0.7 }}>
-      <div style={{ fontFamily: 'var(--font-label)', fontSize: '0.66rem', letterSpacing: '0.35em', color: 'var(--color-text-muted)', textTransform: 'uppercase', writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>Scroll</div>
       <div style={{ width: 1, height: 70, background: 'rgba(var(--color-primary-rgb), 0.1)', position: 'relative', overflow: 'hidden' }}>
         <div ref={fillRef} style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, var(--color-primary), rgba(var(--color-primary-rgb), 0.3))', transformOrigin: 'bottom', transform: 'scaleY(0.08)', opacity: 0.2, willChange: 'transform, opacity', transition: 'opacity .12s' }} />
       </div>

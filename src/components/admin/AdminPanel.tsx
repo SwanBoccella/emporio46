@@ -5,6 +5,7 @@ import { useApp } from '../../context/AppContext'
 import type { SiteSettings, SeoData } from '../../context/AppContext'
 import { groqText, groqVision, groqVisionJson, extractJson, testGroq, getGroqKey, setGroqKey, isValidGroqKey, getModelOverride, setModelOverride, DEFAULT_TEXT_MODELS, DEFAULT_VISION_MODELS, type GroqTestResult } from '../../utils/groq'
 import { adminLogin, clearAdminToken, getAdminToken, changeAdminPassword, adminUploadAsset } from '../../utils/adminApi'
+import { footerGlassStyle, FOOTER_GLASS_DEFAULTS } from '../../utils/footerGlass'
 import { THEME_PRESETS, SECTION_BG_LABELS, SECTION_BG_GROUPS, SECTION_BG_HAS_TEXT, SECTION_BG_DEFAULTS, getSectionBg, buildMapsEmbed, SYNC_STATUS } from '../../context/AppContext'
 import { BgMedia, bgScrimStyle, bgScrimClass } from '../ui/SectionBackdrop'
 import type { CatalogItem, Recensione } from '../../types'
@@ -278,7 +279,7 @@ function ImageUploadZone({ images, onChange, onAiAnalyze }: { images: string[]; 
 // ─── Single image upload (for settings fields) ────────────────────────────────
 // Gli sfondi (sectionBgs + vecchi campi ≤v49) si salvano solo da "Sfondi & Mappa":
 // le altre tab hanno una copia locale che potrebbe essere vecchia e non devono riscriverli.
-const BG_FIELDS = ['sectionBgs', 'footerGlass', 'footerGlassBlur', 'footerGlassBorder', 'heroImageUrl', 'heroImageOpacity', 'heroImageBrightness', 'footerImageUrl', 'footerImageOpacity', 'footerImageBrightness', 'reviewsBgImageUrl', 'reviewsBgOpacity', 'reviewsBgBrightness']
+const BG_FIELDS = ['sectionBgs', 'footerGlassRev', 'catalogSeedRev', 'footerGlass', 'footerGlassBlur', 'footerGlassBorder', 'heroImageUrl', 'heroImageOpacity', 'heroImageBrightness', 'footerImageUrl', 'footerImageOpacity', 'footerImageBrightness', 'reviewsBgImageUrl', 'reviewsBgOpacity', 'reviewsBgBrightness']
 function withoutBgFields<T extends Record<string, any>>(o: T): Partial<T> {
   const out: any = { ...o }
   BG_FIELDS.forEach(k => { delete out[k] })
@@ -3032,6 +3033,13 @@ function SfondiAdmin() {
                       </div>
                     )}
                     {!bg.url && !bg.video && <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Cormorant Garamond, serif', color: '#9a8a78', fontSize: '0.8rem' }}>Nessuna immagine né video · sfondo disattivato</span>}
+                    {slot === 'footer' && (bg.url || bg.video) && (
+                      <div style={{ position: 'absolute', inset: 0, zIndex: 2, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center', padding: 10 }}>
+                        {['Contatti', 'Orari', 'Seguici'].map(t => (
+                          <div key={t} style={{ ...footerGlassStyle(settings), flex: 1, padding: '0.5rem 0.4rem', borderRadius: 12, textAlign: 'center', fontFamily: 'var(--font-display, serif)', fontSize: '0.78rem', color: 'var(--color-text, #2b1a12)' }}>{t}</div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <SingleImageUpload label={bg.video ? 'Immagine (di riserva se il video non c\'è)' : 'Immagine'} value={bg.url} onChange={v => patchBg(slot, { url: v })} aspectRatio="16/6" hidePreview />
@@ -3080,10 +3088,15 @@ function SfondiAdmin() {
                   {slot === 'footer' && (
                     <div style={{ marginTop: '1.4rem', paddingTop: '1.2rem', borderTop: '1px solid rgba(201,168,76,0.25)' }}>
                       <p style={{ ...labelStyle, color: '#e8d9b0', marginBottom: '0.4rem' }}>TRASPARENZA DEI RIQUADRI DEL FOOTER</p>
-                      <p style={{ fontFamily: 'Cormorant Garamond, serif', color: '#9a8a78', fontSize: '0.8rem', margin: '0 0 1rem', lineHeight: 1.4 }}>I riquadri che contengono testi, contatti e loghi. A 0 sono completamente trasparenti: lo sfondo si vede tutto (il testo resta leggibile grazie all'alone).</p>
-                      <BgSlider label="Opacità riquadri (0 = trasparenti)" value={settings.footerGlass ?? 0.56} onChange={v => updateSettings({ footerGlass: v } as Partial<SiteSettings>)} />
-                      <BgSlider label="Sfocatura dello sfondo dietro ai riquadri" value={settings.footerGlassBlur ?? 7} min={0} max={24} step={1} unit="px" onChange={v => updateSettings({ footerGlassBlur: v } as Partial<SiteSettings>)} />
-                      <BgSlider label="Bordo dei riquadri" value={settings.footerGlassBorder ?? 0.3} onChange={v => updateSettings({ footerGlassBorder: v } as Partial<SiteSettings>)} />
+                      <p style={{ fontFamily: 'Cormorant Garamond, serif', color: '#9a8a78', fontSize: '0.8rem', margin: '0 0 1rem', lineHeight: 1.4 }}>I riquadri che contengono testi, contatti e loghi. A 0 sono completamente trasparenti: lo sfondo si vede tutto (il testo resta leggibile grazie all'alone). L'anteprima sopra mostra l'effetto in tempo reale.</p>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: '0.9rem' }}>
+                        {([['Trasparenti', 0], ['Leggeri', 0.15], ['Medi', 0.35], ['Pieni', 0.8]] as [string, number][]).map(([n, v]) => (
+                          <button key={n} onClick={() => updateSettings({ footerGlass: v } as Partial<SiteSettings>)} style={{ ...btnGhost, fontSize: '0.44rem', padding: '0.3rem 0.6rem', borderColor: Math.abs((settings.footerGlass ?? FOOTER_GLASS_DEFAULTS.glass) - v) < 0.005 ? '#c9a84c' : undefined }}>{n}</button>
+                        ))}
+                      </div>
+                      <BgSlider label="Opacità riquadri (0 = trasparenti)" value={settings.footerGlass ?? FOOTER_GLASS_DEFAULTS.glass} onChange={v => updateSettings({ footerGlass: v } as Partial<SiteSettings>)} />
+                      <BgSlider label="Sfocatura dello sfondo dietro ai riquadri" value={settings.footerGlassBlur ?? FOOTER_GLASS_DEFAULTS.blur} min={0} max={24} step={1} unit="px" onChange={v => updateSettings({ footerGlassBlur: v } as Partial<SiteSettings>)} />
+                      <BgSlider label="Bordo dei riquadri" value={settings.footerGlassBorder ?? FOOTER_GLASS_DEFAULTS.border} onChange={v => updateSettings({ footerGlassBorder: v } as Partial<SiteSettings>)} />
                       <button onClick={() => updateSettings({ footerGlass: undefined, footerGlassBlur: undefined, footerGlassBorder: undefined } as Partial<SiteSettings>)} style={{ ...btnGhost, fontSize: '0.44rem', padding: '0.3rem 0.6rem' }}>↺ Ripristina riquadri</button>
                     </div>
                   )}
