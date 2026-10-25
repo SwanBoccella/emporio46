@@ -119,7 +119,7 @@ async function requestOnce(model: string, o: ChatOpts, extra: Extra, budget: num
         }
         const err = new GroqError(msg, res.status, modelGone(res.status, code, apiMsg))
         err.raw = apiMsg
-        if ((res.status === 429 || res.status >= 500) && attempt < 2) {
+        if ((res.status === 429 || res.status >= 500) && code !== 'not_configured' && attempt < 2) {
           const ra = Number(res.headers.get('retry-after'))
           await sleep(Math.min(Number.isFinite(ra) && ra > 0 ? ra * 1000 : 1500 * (attempt + 1), 8000))
           lastErr = err

@@ -16,17 +16,33 @@ export default async (req) => {
   const site = req.headers.get('sec-fetch-site')
   if (site && site !== 'same-origin' && site !== 'none') return err(403, 'forbidden', 'Richiesta non consentita.')
 
-  // Messaggi distinti: dicono ESATTAMENTE quale variabile il server non vede (le variabili si leggono solo dopo un nuovo deploy,
-  // e devono avere l'ambito "Functions" attivo su Netlify).
-  const KEY = (process.env.GROQ_API_KEY || '').trim()
-  if (!KEY) return err(500, 'not_configured', 'Il server non vede GROQ_API_KEY. Su Netlify controlla che sia nelle Environment variables con ambito "Functions" (e senza prefisso VITE_), poi fai un nuovo deploy.')
-
   // La password admin può stare in ADMIN_PASSWORD oppure (se cambiata dal pannello) nell'archivio privato: basta una delle due.
   const stored = await readStored()
   if (!stored && !process.env.ADMIN_PASSWORD) return err(500, 'not_configured', 'Il server non vede né ADMIN_PASSWORD né una password salvata dal pannello. Controlla le variabili Netlify e rifai il deploy.')
 
   const bearer = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '')
   if (!checkToken(bearer, stored)) return err(401, 'session_expired', 'Sessione admin non valida o scaduta: esci e rientra dal pannello.')
+
+  // Chiave Groq: accetta anche qualche nome alternativo e toglie spazi/virgolette incollati per sbaglio.
+  // Il controllo sta DOPO il login admin, così il messaggio diagnostico (che elenca solo i NOMI delle variabili, mai i valori)
+  // lo vede solo l'admin.
+  const readEnv = (n) => {
+    let v = ''
+    try { v = process.env[n] || (typeof Netlify !== 'undefined' ? Netlify.env.get(n) : '') || '' } catch { /* noop */ }
+    return String(v).trim().replace(/^["']+|["']+$/g, '').trim()
+  }
+  const KEY = ['GROQ_API_KEY', 'GROQ_KEY', 'GROQ_API_TOKEN', 'GROQ_TOKEN'].map(readEnv).find(Boolean) || ''
+  if (!KEY) {
+    const similar = Object.keys(process.env).filter(k => /groq|grok|gsk/i.test(k))
+    const adminVisible = !!process.env.ADMIN_PASSWORD
+    return err(500, 'not_configured',
+      'Il server non vede GROQ_API_KEY. ' +
+      `Variabili simili visibili alla Function: ${similar.length ? similar.join(', ') : 'nessuna'}. ` +
+      `ADMIN_PASSWORD visibile: ${adminVisible ? 'sì' : 'no'}. ` +
+      (adminVisible
+        ? 'Le variabili con ambito Functions arrivano, quindi manca proprio GROQ_API_KEY (o il nome è diverso): controlla il nome esatto, maiuscole comprese.'
+        : 'Nessuna variabile segreta arriva alla Function: su Netlify controlla che l\'ambito includa "Functions" (e il contesto di deploy "Production"), poi fai un nuovo deploy.'))
+  }
 
   const raw = await req.text()
   if (raw.length > MAX_BYTES) return err(413, 'too_large', 'Richiesta troppo grande.')
