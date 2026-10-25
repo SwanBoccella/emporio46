@@ -12,7 +12,8 @@ const err = (status, code, message) => new Response(JSON.stringify({ error: { co
   status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
 })
 export default async (req) => {
-  if (req.method !== 'POST') return err(405, 'method_not_allowed', 'Metodo non consentito.')
+  // POST = chiamata AI · GET = diagnostica (solo admin): dice quale variabile vede la Function e se Groq accetta la chiave
+  if (req.method !== 'POST' && req.method !== 'GET') return err(405, 'method_not_allowed', 'Metodo non consentito.')
   const site = req.headers.get('sec-fetch-site')
   if (site && site !== 'same-origin' && site !== 'none') return err(403, 'forbidden', 'Richiesta non consentita.')
 
@@ -31,7 +32,9 @@ export default async (req) => {
     try { v = process.env[n] || (typeof Netlify !== 'undefined' ? Netlify.env.get(n) : '') || '' } catch { /* noop */ }
     return String(v).trim().replace(/^["']+|["']+$/g, '').trim()
   }
-  const KEY = ['GROQ_API_KEY', 'GROQ_DEV_KEY', 'GROQ_KEY', 'GROQ_API_TOKEN', 'GROQ_TOKEN'].map(readEnv).find(Boolean) || ''
+  const KEY_NAMES = ['GROQ_API_KEY', 'GROQ_DEV_KEY', 'GROQ_KEY', 'GROQ_API_TOKEN', 'GROQ_TOKEN']
+  const keyName = KEY_NAMES.find(n => readEnv(n)) || ''
+  const KEY = keyName ? readEnv(keyName) : ''
   if (!KEY) {
     const similar = Object.keys(process.env).filter(k => /groq|grok|gsk/i.test(k))
     const adminVisible = !!process.env.ADMIN_PASSWORD
@@ -42,6 +45,20 @@ export default async (req) => {
       (adminVisible
         ? 'Le variabili con ambito Functions arrivano, quindi manca proprio GROQ_API_KEY (o il nome è diverso): controlla il nome esatto, maiuscole comprese.'
         : 'Nessuna variabile segreta arriva alla Function: su Netlify controlla che l\'ambito includa "Functions" (e il contesto di deploy "Production"), poi fai un nuovo deploy.'))
+  }
+
+  if (req.method === 'GET') {
+    let groqStatus = 0, models = [], detail = ''
+    try {
+      const r = await fetch('https://api.groq.com/openai/v1/models', { headers: { authorization: `Bearer ${KEY}` } })
+      groqStatus = r.status
+      if (r.ok) { const j = await r.json(); models = (j.data || []).map(m => m.id).filter(Boolean) }
+      else detail = (await r.text()).slice(0, 200)
+    } catch { detail = 'Groq non raggiungibile dal server.' }
+    return new Response(JSON.stringify({
+      ok: groqStatus === 200, keyName, keyHint: `${KEY.slice(0, 4)}…${KEY.slice(-4)}`, keyLength: KEY.length,
+      keyFormatOk: KEY.startsWith('gsk_'), groqStatus, detail, models,
+    }), { status: 200, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } })
   }
 
   const raw = await req.text()

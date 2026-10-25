@@ -5,24 +5,25 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 
 const makeLoader = () => { const l = new GLTFLoader(); try { l.setMeshoptDecoder(MeshoptDecoder) } catch {} return l }
 
-export const ARMCHAIR_URL = '/models/armchair.glb'
-const TARGET_SIZE = 1.234            // dimensione massima del modello in scena (altezza della poltrona di default)
+export const ARMCHAIR_URL = '/models/clock.glb'   // modello di default: orologio a pendolo
+const TARGET_SIZE = 1.234            // dimensione massima del modello in scena (altezza dell'orologio di default)
+const DEFAULT_YAW_FIX = -Math.PI / 2  // il fronte dell'orologio nel file guarda verso +X: lo giriamo verso la camera (+Z)
 
 /* ─────────────── Testi di default (modificabili da admin) ─────────────── */
 export interface ArmchairChapter { k: string; t: string; d: string }
 export const DEFAULT_LABEL = { it: 'Il pezzo in vetrina', en: 'The showpiece' }
 export const DEFAULT_CHAPTERS: { it: ArmchairChapter[]; en: ArmchairChapter[] } = {
   it: [
-    { k: 'Pezzo firma', t: 'Una poltrona che entra in scena', d: 'Linee edoardiane, proporzioni importanti, legno lavorato a mano: un arredo che da solo cambia il carattere di una stanza.' },
-    { k: 'Intagli', t: 'Il dettaglio fa la differenza', d: 'Cimasa scolpita, pomelli torniti e profili traforati. È nei dettagli che il vintage di qualità si riconosce.' },
-    { k: 'Tappezzeria', t: 'Tessuto con una storia', d: 'Sedile e schienale rivestiti in un ricco motivo decorativo, per un comfort che non rinuncia alla scena.' },
-    { k: 'Torniture e ottone', t: 'Costruita per durare', d: 'Gambe tornite, traverse robuste e finiture dorate: struttura solida pensata per attraversare i decenni.' },
+    { k: 'Pezzo firma', t: 'Un orologio che scandisce la stanza', d: 'Cassa in legno e linee slanciate: un orologio a pendolo da terra che da solo dà carattere a un ingresso, a un salotto, a un corridoio.' },
+    { k: 'Quadrante', t: 'Il tempo ha un volto', d: 'In alto il quadrante, cuore del pezzo: da vicino si leggono le proporzioni di un orologio da terra di altri tempi.' },
+    { k: 'Cassa e vetro', t: 'Il pendolo dietro il vetro', d: 'Una porta a vetro lascia intravedere pendolo e pesi in ottone: il fascino meccanico che il buon vintage sa conservare.' },
+    { k: 'Legno e base', t: 'Costruito per durare', d: 'Struttura in legno e base robusta, pensata per attraversare i decenni e restare al suo posto, ora dopo ora.' },
   ],
   en: [
-    { k: 'Signature piece', t: 'An armchair that steals the scene', d: 'Edwardian lines, generous proportions, hand-worked wood: one piece that changes the character of a whole room.' },
-    { k: 'Carvings', t: 'Details make the difference', d: 'Carved crest, turned finials and pierced profiles. Quality vintage is recognised in the details.' },
-    { k: 'Upholstery', t: 'Fabric with a story', d: 'Seat and back covered in a rich decorative pattern: comfort that does not give up on drama.' },
-    { k: 'Turnings & brass', t: 'Built to last', d: 'Turned legs, sturdy stretchers and gilded finishes: a solid frame made to cross the decades.' },
+    { k: 'Signature piece', t: 'A clock that sets the pace of the room', d: 'Wooden case and slender lines: a floor-standing pendulum clock that gives character to a hallway, a living room, an entrance.' },
+    { k: 'Dial', t: 'Time has a face', d: 'The dial at the top is the heart of the piece: up close you can read the proportions of a grandfather clock from another era.' },
+    { k: 'Case & glass', t: 'The pendulum behind the glass', d: 'A glazed door lets you glimpse the pendulum and the brass weights: the mechanical charm that good vintage keeps alive.' },
+    { k: 'Wood & base', t: 'Built to last', d: 'A wooden frame and a sturdy base, made to cross the decades and keep its place, hour after hour.' },
   ],
 }
 
@@ -91,7 +92,9 @@ export const sourceKey = (s: ArmchairSource = {}) => `${s.asset ? 'asset:' + s.a
 
 let cache: { key: string; promise: Promise<THREE.Group>; objectUrl?: string } | null = null
 
-function normalize(scene: THREE.Object3D): THREE.Group {
+function normalize(scene: THREE.Object3D, yawFix = 0): THREE.Group {
+  scene.rotation.y = yawFix
+  scene.updateMatrixWorld(true)
   scene.traverse((o: any) => {
     if (!o.isMesh) return
     o.frustumCulled = false
@@ -105,21 +108,21 @@ function normalize(scene: THREE.Object3D): THREE.Group {
   const box = new THREE.Box3().setFromObject(scene)
   const size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3())
   const max = Math.max(size.x, size.y, size.z) || 1
-  scene.position.set(-c.x, -box.min.y, -c.z)
+  scene.position.set(-c.x, -box.min.y, -c.z)   // (la rotazione di orientamento è già inclusa nel box)
   const wrap = new THREE.Group()
   wrap.add(scene)
   wrap.scale.setScalar(TARGET_SIZE / max)
   return wrap
 }
 
-function loadUrl(url: string): Promise<THREE.Group> {
+function loadUrl(url: string, yawFix = 0): Promise<THREE.Group> {
   return new Promise((resolve, reject) => {
-    makeLoader().load(url, gltf => resolve(normalize(gltf.scene)), undefined, reject)
+    makeLoader().load(url, gltf => resolve(normalize(gltf.scene, yawFix)), undefined, reject)
   })
 }
 
 /**
- * Carica (una sola volta per sorgente) la poltrona. Chiamato dal preloader, così quando la sezione
+ * Carica (una sola volta per sorgente) il modello 3D (di default l'orologio a pendolo). Chiamato dal preloader, così quando la sezione
  * 3D monta il modello è già scaricato e parsato.
  */
 export function loadArmchair(src: ArmchairSource = {}): Promise<THREE.Group> {
@@ -150,10 +153,10 @@ export function loadArmchair(src: ArmchairSource = {}): Promise<THREE.Group> {
       const blob = await getLocalModel()
       if (blob) { entry.objectUrl = URL.createObjectURL(blob); url = entry.objectUrl }
     }
-    try { return await loadUrl(url) }
+    try { return await loadUrl(url, url === ARMCHAIR_URL ? DEFAULT_YAW_FIX : 0) }
     catch (e) {
       // Se il file personalizzato è rotto torniamo al modello di default, mai una sezione vuota
-      if (url !== ARMCHAIR_URL) return await loadUrl(ARMCHAIR_URL)
+      if (url !== ARMCHAIR_URL) return await loadUrl(ARMCHAIR_URL, DEFAULT_YAW_FIX)
       throw e
     }
   })()

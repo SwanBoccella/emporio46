@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useApp } from '../../context/AppContext'
 import type { SiteSettings, SeoData } from '../../context/AppContext'
-import { groqText, groqVision, groqVisionJson, extractJson, testGroq, getGroqKey, setGroqKey, isValidGroqKey, getModelOverride, setModelOverride, DEFAULT_TEXT_MODELS, DEFAULT_VISION_MODELS, type GroqTestResult } from '../../utils/groq'
+import { groqText, groqVision, groqVisionJson, extractJson, testGroq, groqDiagnose, getGroqKey, setGroqKey, isValidGroqKey, getModelOverride, setModelOverride, DEFAULT_TEXT_MODELS, DEFAULT_VISION_MODELS, type GroqTestResult } from '../../utils/groq'
 import { adminLogin, clearAdminToken, getAdminToken, changeAdminPassword, adminUploadAsset } from '../../utils/adminApi'
 import { footerGlassStyle, FOOTER_GLASS_DEFAULTS } from '../../utils/footerGlass'
 import { THEME_PRESETS, SECTION_BG_LABELS, SECTION_BG_GROUPS, SECTION_BG_HAS_TEXT, SECTION_BG_DEFAULTS, getSectionBg, buildMapsEmbed, SYNC_STATUS } from '../../context/AppContext'
@@ -138,6 +138,9 @@ function GroqKeyPanel({ onToast }: { onToast: (msg: string) => void }) {
   const [mVision, setMVision] = React.useState(() => getModelOverride('vision'))
   const [testing, setTesting] = React.useState(false)
   const [report, setReport] = React.useState<{ text: GroqTestResult; vision: GroqTestResult } | null>(null)
+  const [diag, setDiag] = React.useState('')
+  const [diagBusy, setDiagBusy] = React.useState(false)
+  const runDiag = async () => { setDiagBusy(true); setDiag(''); try { setDiag(await groqDiagnose()) } finally { setDiagBusy(false) } }
 
   const persist = (): boolean => {
     const k = key.trim()
@@ -172,7 +175,11 @@ function GroqKeyPanel({ onToast }: { onToast: (msg: string) => void }) {
         <button onClick={testKey} disabled={testing} style={{ ...btnGhost, fontSize: '0.44rem', padding: '0.4rem 0.8rem', flexShrink: 0, color: '#6fcf97', borderColor: 'rgba(111,207,151,0.3)' }}>
           {testing ? '⏳' : '✦ Test'}
         </button>
+        <button onClick={runDiag} disabled={diagBusy} title="Mostra cosa vede il server" style={{ ...btnGhost, fontSize: '0.44rem', padding: '0.4rem 0.8rem', flexShrink: 0 }}>
+          {diagBusy ? '⏳' : '🔍 Diagnosi'}
+        </button>
       </div>
+      {diag && <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'Cormorant Garamond, serif', fontSize: '0.86rem', color: '#e8dcc8', background: 'rgba(0,0,0,0.25)', padding: '0.7rem 0.8rem', margin: '0.3rem 0 0.8rem' }}>{diag}</pre>}
       {report && (
         <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '0.88rem', margin: '0.5rem 0 0.8rem' }}>
           {line('Testo', report.text)}

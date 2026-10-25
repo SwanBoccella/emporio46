@@ -93,8 +93,8 @@ type Extra = Record<string, unknown>
 
 async function requestOnce(model: string, o: ChatOpts, extra: Extra, budget: number): Promise<{ text: string; truncated: boolean }> {
   const key = getGroqKey()
-  const token = key ? '' : adminSessionToken()
-  const viaProxy = !key && !!token
+  let token = key ? '' : adminSessionToken()
+  let viaProxy = !key && !!token
   if (!key && !token) throw new GroqError('Chiave Groq mancante: imposta GROQ_API_KEY su Netlify (e accedi come admin) oppure inseriscila in Impostazioni → Chiave API Groq.', 401)
 
   let lastErr: GroqError | null = null
@@ -111,11 +111,16 @@ async function requestOnce(model: string, o: ChatOpts, extra: Extra, budget: num
       if (!res.ok) {
         let apiMsg = '', code = ''
         try { const j = await res.json(); apiMsg = j?.error?.message || ''; code = j?.error?.code || '' } catch { /* noop */ }
+        // La chiave salvata nel browser è rifiutata (vecchia/errata) ma c'è una sessione admin: si ripiega sulla chiave del server
+        if (!viaProxy && res.status === 401 && attempt < 2) {
+          const tk = adminSessionToken()
+          if (tk) { token = tk; viaProxy = true; continue }
+        }
         let msg = explain(res.status, apiMsg)
         if (viaProxy) { // errori del proxy (sessione scaduta, chiave server mancante, funzione non pubblicata)
           if (res.status === 404 || res.status === 405) msg = 'Proxy AI non disponibile: la Netlify Function groq-proxy non è pubblicata. In locale usa VITE_GROQ_DEV_KEY in .env.local.'
           else if (code === 'session_expired') msg = 'Sessione admin scaduta: rifai il login.'
-          else if (code === 'not_configured') msg = apiMsg || 'GROQ_API_KEY mancante nelle variabili Netlify.'
+          else if (code === 'not_configured') msg = (apiMsg || 'GROQ_API_KEY mancante nelle variabili Netlify.') + ' In alternativa incolla la chiave gsk_… in Impostazioni → Chiave API Groq: funziona subito, senza deploy.'
         }
         const err = new GroqError(msg, res.status, modelGone(res.status, code, apiMsg))
         err.raw = apiMsg
@@ -282,6 +287,34 @@ export async function groqVisionJson<T = any>(image: string, prompt: string, max
     maxTokens, temperature: 0.4, timeoutMs: 60000, json: true,
   })
   return extractJson<T>(text)
+}
+
+// Diagnosi: cosa vede il server (variabile, chiave, risposta di Groq, modelli attivi) e cosa c'è nel browser
+export async function groqDiagnose(): Promise<string> {
+  const key = getGroqKey(), token = adminSessionToken()
+  const out: string[] = []
+  out.push(key ? '• Chiave nel browser: presente (viene usata per prima).' : '• Chiave nel browser: assente.')
+  out.push(token ? '• Sessione admin: valida.' : '• Sessione admin: assente o scaduta (esci e rientra dal pannello).')
+  if (token) {
+    try {
+      const r = await fetch(GROQ_PROXY, { method: 'GET', headers: { Authorization: `Bearer ${token}` } })
+      const j: any = await r.json().catch(() => null)
+      if (r.status === 404) out.push('• Server: la Function groq-proxy non esiste su questo sito (non pubblicata).')
+      else if (r.status === 405) out.push('• Server: la Function groq-proxy è una VERSIONE VECCHIA: rifai il deploy con lo zip più recente.')
+      else if (j?.error) out.push('• Server: ' + (j.error.message || j.error.code))
+      else if (j) {
+        out.push(`• Server: chiave trovata nella variabile ${j.keyName} (${j.keyHint}, ${j.keyLength} caratteri)${j.keyFormatOk ? '' : ' — ATTENZIONE: non inizia con gsk_, probabilmente non è una chiave Groq'}.`)
+        out.push(j.ok ? '• Groq accetta la chiave (stato 200).' : `• Groq rifiuta la chiave (stato ${j.groqStatus}). ${j.detail || ''}`.trim())
+        if (j.ok && Array.isArray(j.models)) {
+          const have = (m: string) => j.models.includes(m)
+          const wanted = [...new Set([...DEFAULT_TEXT_MODELS, ...DEFAULT_VISION_MODELS])]
+          out.push('• Modelli usati dal sito: ' + wanted.map(m => `${m} ${have(m) ? '✓' : '✗ non disponibile'}`).join(' · '))
+          if (!wanted.some(have)) out.push('• Nessuno dei modelli del sito è attivo: scrivine uno attuale in "Modelli (avanzate)". Attivi ora: ' + j.models.slice(0, 12).join(', '))
+        }
+      }
+    } catch { out.push('• Server: nessuna risposta dalla Function (rete o sito non raggiungibile).') }
+  }
+  return out.join('\n')
 }
 
 export interface GroqTestResult { ok: boolean; msg: string }

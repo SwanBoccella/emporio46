@@ -102,7 +102,7 @@ export function runPreload(input: PreloadInput, onProgress: (p: number) => void,
   tasks.push({ weight: 1, run: () => ('fonts' in document ? document.fonts.ready.then(() => undefined) : Promise.resolve()) })
   tasks.push({ weight: 1, run: () => windowLoaded() })
   tasks.push({ weight: 2, run: () => warmMap(a.mapUrl) })
-  // Poltrona 3D (~5 MB): scaricata e parsata ora, poi si attende che la sezione 3D abbia disegnato il primo frame
+  // Orologio 3D (~1,7 MB): scaricata e parsata ora, poi si attende che la sezione 3D abbia disegnato il primo frame
   tasks.push({ weight: 4, run: () => Promise.race([loadArmchair(armchairSource(input.settings)).then(() => undefined), new Promise<void>(r => setTimeout(r, 45000))]) })
   tasks.push({ weight: 2, run: () => waitArmchairReady(50000) })
   // Hero: WebGL, particelle e medaglione hanno già compilato e disegnato il primo frame

@@ -10,28 +10,32 @@ import { loadArmchair, armchairSource, sourceKey, resolveChapters, resolveLabel,
 gsap.registerPlugin(ScrollTrigger)
 
 /*
- * Poltrona 3D — attrazione principale del sito.
- * La sezione resta "pinnata" per ~4 schermate: lo scroll guida rotazione e zoom della
- * camera attraverso 4 capitoli (insieme, intagli, tappezzeria, ottone). Si può anche
- * trascinare per ruotare la poltrona in qualsiasi momento.
+ * Orologio a pendolo 3D — attrazione principale del sito.
+ * La sezione resta "pinnata" per ~3,3 schermate: lo scroll guida rotazione e zoom della
+ * camera attraverso 4 capitoli (insieme, quadrante, vetro e pendolo, base). Si parte di fronte,
+ * poi panoramica attorno al pezzo.
+ * L'utente può ruotare il modello trascinando in QUALSIASI momento: la rotazione scelta resta
+ * com'è finché non riprende lo scroll; appena si scorre, la panoramica riprende e il modello
+ * torna dolcemente sul percorso.
  */
 
-// Keyframe della camera: p = progresso scroll 0..1
+// Keyframe della camera: p = progresso scroll 0..1. Si parte con l'orologio di FRONTE (yaw 0), poi una panoramica
+// che gira attorno al pezzo (quadrante → vetro e pendolo → base) e torna di fronte a fine corsa.
 const KEYS = [
-  { p: 0.00, yaw: 0.6,  dist: 3.7, ty: 0.62, pitch: 0.12 },
-  { p: 0.25, yaw: -0.35, dist: 1.75, ty: 1.04, pitch: 0.04 },
-  { p: 0.50, yaw: 0.9,  dist: 1.55, ty: 0.52, pitch: 0.48 },
-  { p: 0.75, yaw: 2.3,  dist: 1.7,  ty: 0.24, pitch: 0.08 },
-  { p: 1.00, yaw: 0.6 + Math.PI * 2, dist: 3.7, ty: 0.62, pitch: 0.12 },
+  { p: 0.00, yaw: 0,    dist: 3.6, ty: 0.62, pitch: 0.04 },
+  { p: 0.25, yaw: 0.38, dist: 1.7, ty: 1.02, pitch: 0.02 },
+  { p: 0.50, yaw: 1.05, dist: 2.0, ty: 0.66, pitch: 0.06 },
+  { p: 0.75, yaw: 2.7,  dist: 1.9, ty: 0.32, pitch: 0.14 },
+  { p: 1.00, yaw: Math.PI * 2, dist: 3.6, ty: 0.62, pitch: 0.04 },
 ]
-// Desktop (schermo largo): la sedia resta SEMPRE intera nel quadro; cambiano solo rotazione e un lieve zoom.
+// Desktop (schermo largo): il pezzo resta SEMPRE intero nel quadro; cambiano solo rotazione e un lieve zoom.
 // Il bersaglio verticale e la distanza minima derivano dalle dimensioni reali del modello (vedi frame()).
 const KEYS_DESK = [
-  { p: 0.00, yaw: 0.6,  dist: 3.3, ty: 0, pitch: 0.12 },
-  { p: 0.25, yaw: -0.35, dist: 3.0, ty: 0, pitch: 0.06 },
-  { p: 0.50, yaw: 0.9,  dist: 3.0, ty: 0, pitch: 0.22 },
-  { p: 0.75, yaw: 2.3,  dist: 3.1, ty: 0, pitch: 0.08 },
-  { p: 1.00, yaw: 0.6 + Math.PI * 2, dist: 3.3, ty: 0, pitch: 0.12 },
+  { p: 0.00, yaw: 0,    dist: 3.3, ty: 0, pitch: 0.04 },
+  { p: 0.25, yaw: 0.38, dist: 3.0, ty: 0, pitch: 0.03 },
+  { p: 0.50, yaw: 1.05, dist: 3.0, ty: 0, pitch: 0.08 },
+  { p: 0.75, yaw: 2.7,  dist: 3.1, ty: 0, pitch: 0.12 },
+  { p: 1.00, yaw: Math.PI * 2, dist: 3.3, ty: 0, pitch: 0.04 },
 ]
 const REF_H = 1.234   // altezza del modello di default dopo la normalizzazione
 const smooth = (t: number) => t * t * (3 - 2 * t)
@@ -106,7 +110,7 @@ export default function ArmchairShowcase() {
     const pivot = new THREE.Group(); scene.add(pivot)
 
     // ── stato animazione ──
-    const st = { progress: 0, shown: 0, userYaw: 0, dragging: false, visible: true, w: 1, h: 1, idleYaw: 0, stacked: false, desktop: false, cy: REF_H / 2, R: 0.75, fy: 1 }
+    const st = { progress: 0, shown: 0, userYaw: 0, userPitch: 0, scrollT: -1e9, scrolling: false, dragging: false, visible: true, w: 1, h: 1, idleYaw: 0, stacked: false, desktop: false, cy: REF_H / 2, R: 0.75, fy: 1 }
     let disposed = false, raf = 0, last = performance.now(), modelReady = false
 
     const resize = () => {
@@ -125,10 +129,18 @@ export default function ArmchairShowcase() {
       const dt = Math.min(0.05, (now - last) / 1000); last = now
       // smorzamento esponenziale: rotazione fluida anche con scroll a scatti (rotella del mouse)
       st.shown += (st.progress - st.shown) * (1 - Math.exp(-dt * 5.5))
-      if (!st.dragging) st.userYaw *= Math.exp(-dt * 0.9)
+      // Rotazione dell'utente: resta ESATTAMENTE dove l'ha lasciata. Solo quando lo scroll riprende,
+      // l'offset si scioglie dolcemente e il modello torna sul percorso della panoramica.
+      st.scrolling = (now - st.scrollT) < 260
+      if (st.scrolling && !st.dragging) {
+        const k = 1 - Math.exp(-dt * 3.2)
+        st.userYaw -= st.userYaw * k
+        st.userPitch -= st.userPitch * k
+      }
       if (reduced) st.idleYaw += dt * 0.25
       const s = sampleKeys(st.shown, st.desktop ? KEYS_DESK : KEYS)
       pivot.rotation.y = s.yaw + st.userYaw + st.idleYaw
+      const pitch = THREE.MathUtils.clamp(s.pitch + st.userPitch, -0.25, 1.1)   // (s può essere un keyframe condiviso: non lo modifico)
       const asp = st.w / st.h
       const wide = !st.stacked && asp > 1.05                         // desktop: sedia a destra, testo a sinistra
       const aspectFit = asp >= 0.9 ? 1 : Math.min(1.5, 0.9 / asp + 0.1)          // stretto: allontana per tenere la sedia nel quadro
@@ -141,13 +153,13 @@ export default function ArmchairShowcase() {
         ty = st.cy
       }
       const shiftX = wide ? 0.16 * d : 0                                          // desktop: sedia a destra, testo a sinistra
-      const cp = Math.cos(s.pitch), sp = Math.sin(s.pitch)
+      const cp = Math.cos(pitch), sp = Math.sin(pitch)
       camera.position.set(-shiftX, ty + sp * d, cp * d)
       camera.lookAt(-shiftX, ty, 0)
       renderer.render(scene, camera)
     }
 
-    // Modello: già scaricato dal preloader (promise condivisa)
+    // Modello (orologio): già scaricato dal preloader (promise condivisa)
     loadArmchair(src).then(model => {
       if (disposed) return
       pivot.add(model)
@@ -157,6 +169,7 @@ export default function ArmchairShowcase() {
         st.cy = Math.max(0.05, size.y / 2)
         st.R = Math.max(0.2, 0.5 * Math.sqrt(size.x * size.x + size.y * size.y + size.z * size.z))
         st.fy = Math.min(1.6, Math.max(0.25, size.y / REF_H))
+        shadow.scale.setScalar(Math.min(1.2, Math.max(0.3, Math.max(size.x, size.z) / 0.7)))   // ombra a terra proporzionata alla base
       } catch {}
       renderer.compile(scene, camera)     // compila gli shader ora (dietro al loader), non al primo scroll
       modelReady = true
@@ -174,8 +187,16 @@ export default function ArmchairShowcase() {
     let trigger: ScrollTrigger | null = null
     if (!reduced) {
       trigger = ScrollTrigger.create({
-        trigger: section, start: 'top top', end: '+=400%', pin: stage, pinSpacing: true, anticipatePin: 1,
+        trigger: section, start: 'top top', end: '+=330%', pin: stage, pinSpacing: true, anticipatePin: 1,
         onUpdate: self => {
+          // lo scroll è (ri)partito: porta la rotazione dell'utente sul giro più breve, così torna sul percorso senza giri a vuoto
+          if (Math.abs(self.progress - st.progress) > 0.0004) {
+            if (!st.scrolling && !st.dragging) {
+              const w = (a: number) => a - Math.PI * 2 * Math.round(a / (Math.PI * 2))
+              st.userYaw = w(st.userYaw)
+            }
+            st.scrollT = performance.now()
+          }
           st.progress = self.progress
           if (barRef.current) barRef.current.style.transform = `scaleY(${self.progress})`
           const idx = Math.min(3, Math.floor(self.progress * 4))
@@ -185,10 +206,16 @@ export default function ArmchairShowcase() {
       })
     }
 
-    // Drag per ruotare
-    let lastX = 0
-    const down = (e: PointerEvent) => { st.dragging = true; lastX = e.clientX; renderer.domElement.setPointerCapture(e.pointerId); renderer.domElement.style.cursor = 'grabbing'; setHinted(false) }
-    const move = (e: PointerEvent) => { if (!st.dragging) return; st.userYaw += (e.clientX - lastX) * 0.012; lastX = e.clientX }
+    // Drag per ruotare (sempre attivo): orizzontale ovunque; verticale (inclinazione) col mouse.
+    // Su touch il gesto verticale resta allo scroll della pagina, che guida la panoramica.
+    let lastX = 0, lastY = 0
+    const down = (e: PointerEvent) => { st.dragging = true; lastX = e.clientX; lastY = e.clientY; try { renderer.domElement.setPointerCapture(e.pointerId) } catch {} renderer.domElement.style.cursor = 'grabbing'; setHinted(false) }
+    const move = (e: PointerEvent) => {
+      if (!st.dragging) return
+      st.userYaw += (e.clientX - lastX) * 0.012
+      if (e.pointerType === 'mouse' || e.pointerType === 'pen') st.userPitch = THREE.MathUtils.clamp(st.userPitch + (e.clientY - lastY) * 0.006, -0.6, 1.1)
+      lastX = e.clientX; lastY = e.clientY
+    }
     const up = (e: PointerEvent) => { st.dragging = false; renderer.domElement.style.cursor = 'grab'; try { renderer.domElement.releasePointerCapture(e.pointerId) } catch {} }
     const el = renderer.domElement
     el.addEventListener('pointerdown', down); el.addEventListener('pointermove', move)
@@ -216,7 +243,7 @@ export default function ArmchairShowcase() {
   return (
     <section id="poltrona" ref={sectionRef} style={{ position: 'relative', background: 'var(--color-bg-alt, #140e08)' }}>
       <div ref={stageRef} style={{ position: 'relative', height: '100svh', minHeight: 560, overflow: 'hidden', isolation: 'isolate' }}>
-        {/* Spot di luce dietro la sedia */}
+        {/* Spot di luce dietro il modello */}
         <div aria-hidden="true" style={{ position: 'absolute', inset: 0, zIndex: -2, background: 'radial-gradient(ellipse 55% 60% at 68% 52%, rgba(var(--color-primary-rgb), 0.20) 0%, transparent 70%)' }} />
         {/* Scritta gigante in outline */}
         <div aria-hidden="true" style={{ position: 'absolute', right: '-2%', bottom: '-6%', zIndex: -1, fontFamily: 'var(--font-display)', fontStyle: 'italic', fontSize: 'clamp(14rem, 38vw, 34rem)', lineHeight: 0.8, color: 'transparent', WebkitTextStroke: '1.5px rgba(var(--color-primary-rgb), 0.18)', userSelect: 'none', pointerEvents: 'none' }}>46</div>

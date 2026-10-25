@@ -488,7 +488,7 @@ Tutti i diritti riservati.
 
 **Chiave Groq**: non va nel codice (finirebbe nel bundle pubblico). Si inserisce da Admin → Perizia AI e resta solo nel browser dell'admin.
 
-**Poltrona 3D** (`ArmchairShowcase.tsx`, `utils/armchair.ts`, `public/models/armchair.glb`): sezione pinnata dopo la marquee. Lo scroll guida rotazione e zoom su 4 capitoli (insieme, intagli, tappezzeria, ottone); si può anche trascinare per ruotare. Il modello (convertito dall'FBX originale in GLB, 4 materiali = 4 draw call) viene scaricato e parsato dal preloader; shader e texture sono compilati prima della chiusura del loader. Il rendering si ferma quando la sezione non è visibile. Se WebGL non è disponibile la sezione si nasconde.
+**Orologio a pendolo 3D** (`ArmchairShowcase.tsx`, `utils/armchair.ts`, `public/models/clock.glb`): sezione pinnata dopo la marquee (~330% di scroll). Si parte con l'orologio di fronte, poi panoramica attorno al pezzo su 4 capitoli (insieme, quadrante, vetro e pendolo, base). Si può trascinare per ruotare in qualsiasi momento: la rotazione dell'utente resta finché non riprende lo scroll, poi la panoramica riprende e il modello torna sul percorso. Il GLB (1,7 MB) è l'originale alleggerito: texture JPEG 2048/1024, vetro come semplice materiale trasparente (niente pass di trasmissione), ottone sui dettagli metallici; il fronte del modello guarda +X e viene girato verso la camera in `armchair.ts` (`DEFAULT_YAW_FIX`). I nomi interni (`Armchair*`, `armchair*` nelle impostazioni) sono rimasti per compatibilità con admin e dati salvati.
 
 
 
