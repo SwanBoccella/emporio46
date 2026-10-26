@@ -1,7 +1,7 @@
 {
   "name": "emporio-46",
   "private": true,
-  "version": "67.0.0",
+  "version": "71.0.0",
   "type": "module",
   "engines": {
     "node": ">=18.0.0",
@@ -11,7 +11,10 @@
     "dev": "vite",
     "build": "vite build && node scripts/generate-seo.mjs",
     "preview": "vite preview",
-    "test:groq": "node --experimental-strip-types tests/groq.test.mjs"
+    "test:groq": "node --experimental-strip-types tests/groq.test.mjs",
+    "test:gemini": "node --experimental-strip-types --import ./tests/_resolve.mjs tests/gemini.test.mjs",
+    "test:duo": "node --experimental-strip-types --import ./tests/_resolve.mjs tests/duo.test.mjs",
+    "test": "npm run test:groq && npm run test:gemini && npm run test:duo"
   },
   "dependencies": {
     "@emailjs/browser": "^4.3.3",

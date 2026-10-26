@@ -94,21 +94,16 @@ function Digit({ value, label, bg, border, text, primary, muted, accent }: {
   bg: string; border: string; text: string; primary: string; muted: string; accent?: boolean
 }) {
   const str = String(value).padStart(2, '0')
-  const notch = { position: 'absolute' as const, top: '50%', width: 5, height: 9, marginTop: -4.5, background: bg, border: `1px solid ${primary}33`, zIndex: 3 }
   return (
     <div style={{ flex: '1 1 0', minWidth: 0, maxWidth: 100, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.7rem' }}>
       <div style={{
         position: 'relative', width: '100%', aspectRatio: '5 / 6', borderRadius: 14, overflow: 'hidden',
-        background: `linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.03) 49.6%, rgba(0,0,0,0.30) 50.4%, rgba(0,0,0,0.12) 100%), ${bg}`,
+        background: `linear-gradient(180deg, rgba(255,255,255,0.09) 0%, rgba(255,255,255,0.02) 55%, rgba(0,0,0,0.16) 100%), ${bg}`,
         border: `1px solid ${accent ? `${primary}8c` : border}`,
         boxShadow: `inset 0 1px 0 rgba(255,255,255,0.16), inset 0 -14px 24px rgba(0,0,0,0.30), 0 12px 28px rgba(0,0,0,0.45)${accent ? `, 0 0 26px ${primary}40` : ''}`,
       }}>
         {/* riflesso morbido in alto */}
         <div style={{ position: 'absolute', left: '8%', right: '8%', top: 0, height: 1, background: `linear-gradient(to right, transparent, ${primary}${accent ? 'cc' : '80'}, transparent)`, zIndex: 3 }} />
-        {/* cerniera centrale */}
-        <div style={{ position: 'absolute', left: 0, right: 0, top: '50%', height: 1, marginTop: -0.5, background: 'rgba(0,0,0,0.55)', boxShadow: '0 1px 0 rgba(255,255,255,0.07)', zIndex: 2 }} />
-        <div style={{ ...notch, left: -1, borderRadius: '0 4px 4px 0', borderLeft: 'none' }} />
-        <div style={{ ...notch, right: -1, borderRadius: '4px 0 0 4px', borderRight: 'none' }} />
         <AnimatePresence mode="popLayout" initial={false}>
           <motion.span key={str}
             style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display, Cinzel, serif)', fontSize: 'clamp(1.9rem, 9.5vw, 3rem)', fontWeight: 500, fontVariantNumeric: 'lining-nums tabular-nums', fontFeatureSettings: '"lnum" 1, "tnum" 1', color: text, textShadow: `0 0 18px ${primary}${accent ? '66' : '33'}, 0 2px 4px rgba(0,0,0,0.55)`, zIndex: 1 }}
@@ -248,7 +243,7 @@ export default function MaintenancePage({ onExpired }: { onExpired: () => void }
       </motion.div>
 
       {/* Main content */}
-      <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'clamp(1.2rem, 3vw, 2rem)', width: '100%', maxWidth: 640, textAlign: 'center', margin: 'auto 0' }}>
+      <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'clamp(0.85rem, 2.2vh, 2rem)', width: '100%', maxWidth: 640, textAlign: 'center', margin: 'auto 0' }}>
 
         {/* Logo */}
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}>
@@ -321,7 +316,7 @@ export default function MaintenancePage({ onExpired }: { onExpired: () => void }
         {!expired && (
           <motion.div initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1], delay: 0.55 }}
             style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
-            <HeroOrb label={t.hero.label} size="clamp(170px, min(52vw, 30vh), 250px)" className="maint-orb" touchAction="none" />
+            <HeroOrb label={t.hero.label} size="clamp(120px, min(40vw, 20vh), 210px)" className="maint-orb" touchAction="none" />
           </motion.div>
         )}
 

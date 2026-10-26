@@ -30,7 +30,7 @@ function devKey(): string {
 }
 
 // Sessione admin (stessa chiave di adminApi.ts): serve per usare la chiave Groq custodita sul server
-function adminSessionToken(): string {
+export function adminSessionToken(): string {
   try {
     const t = localStorage.getItem('mnt_admin_token') || ''
     if (!t) return ''
@@ -81,14 +81,15 @@ function modelGone(status: number, code: string, msg: string) {
 }
 
 // Rimuove il ragionamento interno ("<think>…</think>", anche se troncato e senza chiusura)
-function cleanReply(raw: string): string {
+export function cleanReply(raw: string): string {
   let t = (raw ?? '').toString()
   t = t.replace(/<think>[\s\S]*?<\/think>/gi, '')
   if (/<think>/i.test(t)) t = t.replace(/<think>[\s\S]*$/i, '') // blocco aperto e mai chiuso
   return t.replace(/<\/think>/gi, '').trim()
 }
 
-interface ChatOpts { messages: unknown[]; maxTokens: number; temperature: number; timeoutMs?: number; json?: boolean }
+type Think = 'low' | 'medium' | 'high'
+interface ChatOpts { messages: unknown[]; maxTokens: number; temperature: number; timeoutMs?: number; json?: boolean; think?: Think }
 type Extra = Record<string, unknown>
 
 async function requestOnce(model: string, o: ChatOpts, extra: Extra, budget: number): Promise<{ text: string; truncated: boolean }> {
@@ -151,8 +152,9 @@ async function requestOnce(model: string, o: ChatOpts, extra: Extra, budget: num
 // - gpt-oss: ragionamento ridotto (reasoning_effort: low)
 // - qwen3.8: modalità "instruct" senza pensiero (reasoning_effort: none) → risposta diretta e veloce
 // - JSON mode (response_format) solo quando serve JSON; se il modello lo rifiuta si ricade sul prompt
-function variantsFor(model: string, json: boolean): Extra[] {
-  const effort: Extra = /gpt-oss/i.test(model) ? { reasoning_effort: 'low' } : /qwen/i.test(model) ? { reasoning_effort: 'none' } : {}
+// Con `think` il modello ragiona prima di rispondere (serve per riconoscere opere, marchi, epoche: più lento ma molto più accurato)
+function variantsFor(model: string, json: boolean, think?: Think): Extra[] {
+  const effort: Extra = /gpt-oss/i.test(model) ? { reasoning_effort: think || 'low' } : /qwen/i.test(model) ? (think ? {} : { reasoning_effort: 'none' }) : {}
   const list: Extra[] = []
   if (json) list.push({ ...effort, response_format: { type: 'json_object' } })
   list.push({ ...effort })
@@ -167,10 +169,10 @@ async function chat(kind: GroqKind, o: ChatOpts): Promise<string> {
   let allGone = true
   for (const model of modelsFor(kind)) {
     const isReasoning = /gpt-oss|qwen/i.test(model)
-    for (const extra of variantsFor(model, !!o.json)) {
+    for (const extra of variantsFor(model, !!o.json, o.think)) {
       // se il pensiero è attivo consuma token dal budget: lasciamo margine
       const thinking = isReasoning && extra.reasoning_effort !== 'none'
-      const baseBudget = thinking ? o.maxTokens + 1500 : o.maxTokens
+      const baseBudget = thinking ? o.maxTokens + (o.think && o.think !== 'low' ? 3500 : 1500) : o.maxTokens
       try {
         let r = await requestOnce(model, o, extra, baseBudget)
         if (!r.text && r.truncated) r = await requestOnce(model, o, extra, baseBudget * 2)
@@ -223,9 +225,9 @@ export async function groqJson<T = any>(prompt: string, maxTokens = 700): Promis
 
 // ─── Immagini ────────────────────────────────────────────────────────────────
 // Groq non può leggere percorsi relativi del sito ("/catalog/foto.jpg"), blob: né file locali:
-// qualsiasi immagine viene scaricata dal browser, ridotta (max 1024px) e inviata come data URL JPEG.
-function drawToJpeg(img: CanvasImageSource, w: number, h: number): string | null {
-  const MAX = 1024
+// qualsiasi immagine viene scaricata dal browser, ridotta (max 1536px) e inviata come data URL JPEG.
+function drawToJpeg(img: CanvasImageSource, w: number, h: number, MAX = 1536, quality = 0.85): string | null {
+  // 1536 px bastano per leggere firme, punzoni e scritte piccole; Gemini riceve 2048 px
   const ratio = Math.min(1, MAX / Math.max(w, h))
   const width = Math.max(1, Math.round(w * ratio)), height = Math.max(1, Math.round(h * ratio))
   const canvas = document.createElement('canvas')
@@ -234,7 +236,7 @@ function drawToJpeg(img: CanvasImageSource, w: number, h: number): string | null
   if (!ctx) return null
   ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, width, height)
   ctx.drawImage(img, 0, 0, width, height)
-  try { return canvas.toDataURL('image/jpeg', 0.85) } catch { return null } // canvas "tainted"
+  try { return canvas.toDataURL('image/jpeg', quality) } catch { return null } // canvas "tainted"
 }
 
 function loadImage(src: string, cors: boolean): Promise<HTMLImageElement> {
@@ -247,12 +249,23 @@ function loadImage(src: string, cors: boolean): Promise<HTMLImageElement> {
   })
 }
 
-export async function prepareImage(src: string): Promise<string> {
+// La stessa foto serve a più passaggi (due IA, arbitro, revisore): si prepara una volta sola
+const imgCache = new Map<string, string>()
+export async function prepareImage(src: string, max = 1536, quality = 0.85): Promise<string> {
   if (!src) throw new GroqError('Nessuna immagine da analizzare.')
+  const ck = `${max}|${quality}|${src}`
+  const hit = imgCache.get(ck)
+  if (hit) return hit
+  const out = await prepareImageUncached(src, max, quality)
+  imgCache.set(ck, out)
+  if (imgCache.size > 6) imgCache.delete(imgCache.keys().next().value as string)
+  return out
+}
+async function prepareImageUncached(src: string, max: number, quality: number): Promise<string> {
   const abs = src.startsWith('data:') ? src : new URL(src, window.location.href).href
   try {
     const img = await loadImage(abs, !abs.startsWith('data:') && !abs.startsWith('blob:'))
-    const out = drawToJpeg(img, img.naturalWidth || img.width, img.naturalHeight || img.height)
+    const out = drawToJpeg(img, img.naturalWidth || img.width, img.naturalHeight || img.height, max, quality)
     if (out) return out
   } catch { /* si prova con fetch */ }
   try {
@@ -262,7 +275,7 @@ export async function prepareImage(src: string): Promise<string> {
       const url = URL.createObjectURL(blob)
       try {
         const img = await loadImage(url, false)
-        const out = drawToJpeg(img, img.naturalWidth || img.width, img.naturalHeight || img.height)
+        const out = drawToJpeg(img, img.naturalWidth || img.width, img.naturalHeight || img.height, max, quality)
         if (out) return out
       } finally { URL.revokeObjectURL(url) }
     }
@@ -280,13 +293,42 @@ export async function groqVision(image: string, prompt: string, maxTokens = 1800
   })
 }
 
-export async function groqVisionJson<T = any>(image: string, prompt: string, maxTokens = 1200): Promise<T> {
+export async function groqVisionJson<T = any>(image: string, prompt: string, maxTokens = 1200, think?: Think): Promise<T> {
   const url = await prepareImage(image)
   const text = await chat('vision', {
     messages: [{ role: 'user', content: [{ type: 'image_url', image_url: { url } }, { type: 'text', text: prompt }] }],
-    maxTokens, temperature: 0.4, timeoutMs: 60000, json: true,
+    maxTokens, temperature: think ? 0.2 : 0.4, timeoutMs: think ? 75000 : 60000, json: true, think,
   })
   return extractJson<T>(text)
+}
+
+// ─── Chiamate "da perito": system prompt, ragionamento attivo, temperatura bassa ───
+export async function groqExpertVisionJson<T = any>(image: string, system: string, prompt: string, maxTokens = 1500): Promise<T> {
+  const url = await prepareImage(image)
+  const text = await chat('vision', {
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: [{ type: 'image_url', image_url: { url } }, { type: 'text', text: prompt }] },
+    ],
+    maxTokens, temperature: 0.2, timeoutMs: 80000, json: true, think: 'medium',
+  })
+  return extractJson<T>(text)
+}
+export async function groqExpertVisionText(image: string, system: string, prompt: string, maxTokens = 900): Promise<string> {
+  const url = await prepareImage(image)
+  return chat('vision', {
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: [{ type: 'image_url', image_url: { url } }, { type: 'text', text: prompt }] },
+    ],
+    maxTokens, temperature: 0.2, timeoutMs: 80000, think: 'medium',
+  })
+}
+export function groqExpertText(system: string, prompt: string, maxTokens = 1600, think: Think = 'medium'): Promise<string> {
+  return chat('text', {
+    messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }],
+    maxTokens, temperature: 0.3, timeoutMs: 80000, think,
+  })
 }
 
 // Diagnosi: cosa vede il server (variabile, chiave, risposta di Groq, modelli attivi) e cosa c'è nel browser

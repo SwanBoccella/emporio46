@@ -311,9 +311,10 @@ Si impostano su **Netlify → Site configuration → Environment variables** e v
 | `ADMIN_PASSWORD_FORCE_ENV` | *(opzionale)* `1` = ignora la password cambiata dal pannello e riusa `ADMIN_PASSWORD` (recupero se la dimentichi) |
 | `GIST_TOKEN` | Token GitHub *classic* con **solo** lo scope `gist`. Serve alla Function per scrivere sul Gist |
 | `GROQ_API_KEY` | Chiave Groq (`gsk_…`) per le funzioni AI. Usata solo dalla Function `groq-proxy`, che risponde solo a chi ha fatto login admin |
+| `GEMINI_API_KEY` | *(v71)* Chiave Gemini (da aistudio.google.com/apikey). Usata solo dalla Function `gemini-proxy`, che risponde solo a chi ha fatto login admin. Con entrambe le chiavi la perizia parte in doppia analisi; con una sola funziona comunque |
 | `GIST_ID` | *(opzionale)* ID del Gist lato server; se assente la Function usa `VITE_GIST_ID` |
 
-> Segna `ADMIN_PASSWORD`, `GIST_TOKEN` e `GROQ_API_KEY` come **secret** (opzione "Contains secret values") e limita lo scope alle *Functions*.
+> Segna `ADMIN_PASSWORD`, `GIST_TOKEN`, `GROQ_API_KEY` e `GEMINI_API_KEY` come **secret** (opzione "Contains secret values") e limita lo scope alle *Functions*.
 
 ### Checklist Netlify (riepilogo)
 
@@ -537,3 +538,37 @@ Anche `public/og-image.jpg` (anteprima social 1200×630) e `public/manifest.webm
 
 **Dopo aver collegato il dominio:** su Netlify aggiungi la variabile `SITE_URL` (es. `https://www.tuodominio.it`, senza `/` finale) e rifai il deploy; poi in Google Search Console aggiungi la proprietà e invia `https://tuodominio.it/sitemap.xml`.
 Se cambi l'indirizzo o gli orari dal pannello admin, ricordati di allinearli anche nel blocco JSON-LD e nel `<noscript>` (`index.html` e `scripts/generate-seo.mjs`).
+
+## Perizia AI rifatta (v69)
+
+La perizia ora lavora in due passaggi (`src/utils/perizia.ts`):
+
+1. **Osservazione** (modello con visione, ragionamento attivo, foto fino a 1536 px): descrive, trascrive solo firme/punzoni/etichette leggibili, formula 1-3 ipotesi con confidenza e dice quali altre foto servono. Non stima prezzi.
+2. **Valutazione** (modello di testo più forte, ragionamento attivo): applica un prontuario (arte, design, vetro e ceramica, gioielli e argenti, numismatica, abbigliamento, modernariato) e un metodo di stima in 4 classi (A decorativo, B vintage commerciale, C firmato/di design, D arte/numismatica rara/gioielleria preziosa/orologi → non stimabile da foto). Il prezzo è un intervallo (max 2×), con prezzo di vendita e valore di realizzo separati e livello di fiducia.
+
+Le domande e correzioni nella chat ragionano sulle osservazioni già estratte (ed hanno la precedenza sulla foto). "Suggerisci prezzo" e "Compila da foto" usano lo stesso metodo. I titoli `###` nel testo ora sono resi correttamente.
+
+Limite: su Groq l'unico modello con visione è piccolo e in anteprima, quindi il riconoscimento di autori e marchi resta un'ipotesi da verificare (foto di retro, firma e punzoni).
+
+### Dati dell'admin nella perizia (v70)
+
+Tutto ciò che l'admin scrive durante la perizia (autore, marchio, materiale, epoca, misure, scritte lette dal vivo) è un **dato vincolante**: a ogni messaggio la valutazione viene rifatta partendo da quei dati, non continuando a ragionare sopra gli errori precedenti dell'AI. Ogni risposta inizia con "Ho registrato", così si vede come è stato inteso il messaggio (es. "Fontana" → Lucio Fontana). Se l'admin chiede di guardare un dettaglio (firma, retro, angolo…), la foto viene riletta e l'osservazione resta nella perizia. I dati restano anche dopo "Ri-analizza da capo" e passano alla scheda catalogo; un'attribuzione detta a voce compare come "attribuito a / nello stile di", mai come fatto certo.
+
+## Doppia IA: Gemini + Groq coordinati (v71)
+
+Ogni oggetto caricato dall'admin (Admin → **Perizia AI**, e il pulsante «✦ Analizza con AI» nel modulo dell'oggetto) viene ora analizzato da **due IA indipendenti** che si controllano a vicenda (`src/utils/perizia.ts`):
+
+1. **Osservazione parallela** — Gemini e Groq guardano la stessa foto per conto loro, con lo stesso prontuario, le stesse regole di onestà e i dati del titolare.
+2. **Riconciliazione** — Gemini fa da arbitro: riguarda la foto dove le due letture divergono (categoria, natura/autenticità, scritte, autore/marca), tiene solo le scritte che legge davvero e, se non riesce a risolvere un dubbio, sceglie la lettura più prudente (replica piuttosto che originale, nessuna attribuzione piuttosto che un'attribuzione). Un confronto automatico in codice misura l'accordo e **impedisce all'arbitro di dichiararlo più alto** di quanto sia.
+3. **Perizia** — la scrive Groq a partire dalle osservazioni riconciliate (Gemini se Groq manca).
+4. **Revisione** — l'IA che *non* ha scritto la perizia la ricontrolla guardando la foto. In parallelo girano controlli automatici in codice (intervallo di prezzo ≤ 2× per le classi A/B e ≤ 2,5× per la C, coerenza classe↔prezzo, realizzo 40–60%, sezioni obbligatorie, formato). Una correzione viene accettata solo se non peggiora il testo; i rilievi residui ricevono una riscrittura mirata.
+
+Sotto ogni perizia c'è un indicatore (accordo alto/medio/basso, revisione, note) e in fondo al testo un blocco «Verifica incrociata» con le discrepanze trovate. Anche le **domande di approfondimento** rileggono il dettaglio con entrambe le IA, il **suggerimento prezzo** fa stimare entrambe (vale la sovrapposizione delle fasce, o la più prudente se sono lontane) e la **scheda del catalogo** nasce dalla lettura riconciliata, con la stima riportata in codice entro 2×.
+
+**Se una IA non è disponibile** (chiave mancante, quota, modello dismesso) l'analisi prosegue con l'altra e lo dichiara nella nota; la revisione diventa un'autoverifica.
+
+**Configurazione**: `GEMINI_API_KEY` su Netlify (come `GROQ_API_KEY`), oppure la chiave incollata in Impostazioni → *Chiave API Gemini* (solo in quel browser, ha la precedenza e non ha limiti di tempo di una Function). I modelli (`src/utils/gemini.ts`: `gemini-3.8-flash` → `gemini-3.6-flash` → `gemini-3.1-pro-preview` → `gemini-3-flash-preview`) hanno ripiego automatico e si possono sovrascrivere dal pannello. Dal proxy Netlify il ragionamento «high» è limitato a «medium» per restare nel tempo massimo delle Function sincrone (60 s secondo la documentazione Netlify attuale; in passato 10 s): con la chiave nel pannello l'analisi gira a pieno regime. La CSP (`public/_headers`) ora consente `generativelanguage.googleapis.com`.
+
+**Tempi e costi**: un'analisi completa fa fino a 4 passaggi in sequenza (osservazione ∥, arbitro, perizia, revisione): circa 1–2 minuti e più richieste rispetto a prima. Entrambe le API hanno un piano gratuito con limiti di quota.
+
+**Test**: `npm test` (Node ≥ 22) esegue i test Groq, Gemini (fetch simulato) e della coordinazione (motori simulati: accordo, discrepanze, correzione, scarto di correzioni peggiori, degradazione a una sola IA).
