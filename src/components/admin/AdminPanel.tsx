@@ -5,6 +5,7 @@ import { useApp } from '../../context/AppContext'
 import type { SiteSettings, SeoData } from '../../context/AppContext'
 import { groqText, groqVision, extractJson, testGroq, groqDiagnose, getGroqKey, setGroqKey, isValidGroqKey, getModelOverride, setModelOverride, DEFAULT_TEXT_MODELS, DEFAULT_VISION_MODELS, type GroqTestResult } from '../../utils/groq'
 import { periziaAnalyze, periziaFollowUp, periziaPrezzo, schedaDaFoto, datiTitolare, isSoloDomanda, type PeriziaMeta } from '../../utils/perizia'
+import { emailJsConfig } from '../../utils/emailjsConfig'
 import { testGemini, geminiDiagnose, geminiText, geminiVision, geminiJson, getGeminiKey, setGeminiKey, isValidGeminiKey, getGeminiModelOverride, setGeminiModelOverride, DEFAULT_GEMINI_MODELS, type GeminiTestResult } from '../../utils/gemini'
 import { adminLogin, clearAdminToken, getAdminToken, changeAdminPassword, adminUploadAsset } from '../../utils/adminApi'
 import { footerGlassStyle, FOOTER_GLASS_DEFAULTS } from '../../utils/footerGlass'
@@ -766,19 +767,13 @@ function Dashboard({ setTab, catalog, reviews }: { setTab: (t: AdminTab) => void
 
 // ─── EmailJS: diagnostica + email di prova ────────────────────────────────────
 function EmailJsTools({ local }: { local: SiteSettings }) {
-  const env = import.meta.env as Record<string, string | undefined>
-  const serviceId = (env.VITE_EMAILJS_SERVICE || local.emailjsServiceId || '').trim()
-  const publicKey = (env.VITE_EMAILJS_PUBLIC_KEY || local.emailjsPublicKey || '').trim()
-  const tplShop = (env.VITE_EMAILJS_TEMPLATE || local.emailjsTemplateBook || local.emailjsTemplateRequest || local.emailjsTemplateEstimate || '').trim()
-  const tplClient = (env.VITE_EMAILJS_TEMPLATE_CLIENT || local.emailjsTemplateClient || '').trim()
+  const { serviceId, publicKey, tplShop, tplClient, ready, fromEnv } = emailJsConfig(local)
   const canWrite = SYNC_STATUS.canRead && !!getAdminToken()
   const [testEmail, setTestEmail] = useState(local.email || '')
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null)
 
-  const missing = [!serviceId && 'Service ID', !publicKey && 'Public Key', !tplShop && 'Template negozio'].filter(Boolean) as string[]
-  const fromEnv = !!env.VITE_EMAILJS_SERVICE
-  const ready = missing.length === 0 && (local.emailjsEnabled || fromEnv)
+  const { missing } = emailJsConfig(local)
 
   const errText = (e: unknown) => {
     const x = e as { status?: number; text?: string; message?: string }
@@ -808,6 +803,7 @@ function EmailJsTools({ local }: { local: SiteSettings }) {
       if (tplClient) {
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(testEmail.trim())) lines.push('⚠ Conferma cliente non provata: inserisci un\'email di prova valida.')
         else {
+          await new Promise(r => setTimeout(r, 1300)) // EmailJS: ~1 richiesta al secondo
           try { await to(emailjs.send(serviceId, tplClient, params, publicKey)); lines.push('✓ Conferma cliente inviata a ' + testEmail.trim()) }
           catch (e) { lines.push('✗ Conferma cliente: ' + errText(e)) }
         }
@@ -843,7 +839,7 @@ function EmailJsTools({ local }: { local: SiteSettings }) {
           ? <span style={{ color: '#6fcf97' }}>✓ Configurazione completa — i form inviano email{fromEnv ? ' (valori da variabili d\'ambiente)' : ''}.</span>
           : missing.length > 0
             ? <span style={{ color: '#c9a84c' }}>Mancano: {missing.join(', ')}. Finché non sono compilati, i form aprono WhatsApp.</span>
-            : <span style={{ color: '#c9a84c' }}>Attiva l'interruttore "EmailJS attivo": al momento i form aprono WhatsApp.</span>}
+            : null}
       </div>
 
       {/* Email di prova */}
@@ -1384,13 +1380,11 @@ Regole:
 
           <EmailJsTools local={local} />
 
-          <Toggle
-            label="EmailJS attivo (se disattivo, i form aprono WhatsApp)"
-            checked={local.emailjsEnabled ?? false}
-            onChange={v => f('emailjsEnabled')(v)}
-          />
+          <p style={{ fontFamily: 'Cormorant Garamond, serif', color: '#9a8a78', fontSize: '0.85rem' }}>
+            I form (Passa a trovarci, Cerco un pezzo, Scrivici) inviano sempre email. I campi qui sotto, se compilati, hanno la precedenza sui valori predefiniti del sito.
+          </p>
 
-          {(local.emailjsEnabled) && (
+          {(true) && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', borderLeft: '2px solid rgba(201,168,76,0.25)', paddingLeft: '1.2rem' }}>
               <div>
                 <label style={labelStyle}>Service ID</label>

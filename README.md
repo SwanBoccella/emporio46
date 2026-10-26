@@ -56,6 +56,8 @@ Sito vetrina per **Emporio 46**, negozio di arredi vintage e bijoux in Via Giamp
 | 3D / WebGL | Three.js | 0.167 |
 | Email | EmailJS Browser | 4.3 |
 | SEO | react-helmet-async | 2.0 |
+| Backend | Netlify Functions, Database, Blobs | — |
+| AI (admin) | Gemini e Groq via proxy lato server | — |
 
 ---
 
@@ -90,7 +92,7 @@ emporio-46/
 │   │       ├── MarqueeStrip.tsx
 │   │       └── WhatsAppButton.tsx
 │   ├── context/
-│   │   └── AppContext.tsx      # Stato globale + persistenza localStorage
+│   │   └── AppContext.tsx      # Stato globale + sincronizzazione server (localStorage solo cache)
 │   ├── hooks/
 │   │   └── useLenis.ts         # Smooth scroll (GSAP ticker integrato)
 │   ├── i18n/
@@ -172,41 +174,40 @@ emporio-46/
 
 ## Pannello Admin
 
-Accessibile premendo l'icona ⚙ in basso a destra. Protetto da password (default: `St3f4ni4Z0cch12026`, modificabile dall'admin stesso).
+Accessibile premendo l'icona ⚙ in basso a sinistra. Il login è verificato lato server dalla Netlify Function `admin-api`: la password iniziale è quella impostata nella variabile d'ambiente `ADMIN_PASSWORD` su Netlify (nessuna password di default nel codice o nella documentazione). Dal tab **Password** si può cambiare: la nuova viene salvata cifrata (scrypt) in Netlify Blobs. In `npm run dev` la password è `dev`.
 
 ### Tab disponibili
 
 | Tab | Contenuto |
 |---|---|
-| **Dashboard** | Riepilogo: totale oggetti, disponibili, in evidenza, rating medio |
-| **Catalogo** | CRUD completo articoli: nome IT/EN, era, categoria, prezzo, stato, immagini, sconti |
+| **Dashboard** | Riepilogo: totale oggetti, disponibili, in evidenza, rating medio, scorciatoie |
+| **Catalogo** | CRUD articoli: nome IT/EN, era, categoria, prezzo, stato, immagini, sconti; aiuti AI e Perizia AI |
 | **Recensioni** | CRUD recensioni: autore, città, stelle, testo IT/EN, visibilità, in evidenza |
-| **Impostazioni** | Identità sito, contatti, link social, Google Maps, orari, testi about, EmailJS |
+| **Impostazioni** | Identità sito, contatti, social, Google Maps, testi, manutenzione, EmailJS, chiavi AI |
 | **SEO** | Meta title, description, keywords, robots, OG image, canonical, Google Analytics ID |
-| **Media** | URL immagini hero, about, footer, recensioni + slider opacità/luminosità/sepia |
-| **Aspetto** | Palette colori (7 variabili), font display/body, preset tema one-click |
+| **Media** | Libreria immagini e upload |
+| **Aspetto** | Palette colori, font, preset tema one-click |
+| **Sfondi & Mappa** | Immagine e video di sfondo per ogni zona, trasparenza del footer, mappa |
 | **Sconti** | Creazione/gestione sconti, associazione ad articoli, date di scadenza |
 | **Banner** | Banner annunci: testo, colore, attiva/disattiva |
-| **Orari** | Orari giornalieri lun–dom (testo libero) |
-| **Analytics** | Visualizzazione rapida configurazione GA4 |
+| **Orari** | Orari giornalieri lun–dom |
+| **Arte 3D** | Modello 3D (GLB) della sezione pinnata, capitoli IT/EN |
+| **Accreditamenti** | 4 slot nel footer: nome, logo, link |
+| **Analytics** | Riepilogo configurazione GA4 e statistiche rapide |
 
 ### Preset tema
-Quattro preset predefiniti one-click:
-- **Emporio 46** (default) — marrone caldo quasi-nero, ambra vintage con accento verde petrolio
-- **Oro scuro** — sfondo quasi-nero, oro antico
-- **Avorio** — toni chiari caldi, oro tenue
-- **Bordeaux** — sfondo vinoso, accenti bordeaux
-- **Grafite** — grigio neutro, accenti argento
+Preset one-click in *Aspetto* (definiti in `THEME_PRESETS`, `src/context/AppContext.tsx`):
+- **Emporio 46** (default) — carta crema, arancio bruciato e verde petrolio
+- **Emporio 46 · Notte** — versione scura: marrone caldo, ambra e verde petrolio
+- **Espresso**, **Mogano**, **Terra di Siena**, **Inchiostro**, **Ardesia**, **Muschio** — varianti scure
 
 ### Persistenza
-Tutti i dati sono salvati in `localStorage` con le chiavi:
-```
-mnt_settings
-mnt_settings_en
-mnt_catalog
-mnt_reviews
-mnt_seo
-```
+I dati sono salvati **sul server**, visibili a ogni visitatore:
+- **Netlify Database** (tabella `site_data`): impostazioni, catalogo, recensioni, SEO, traduzioni EN
+- **Netlify Blobs**: immagini, video e modello 3D caricati dall'admin (serviti da `/media/<id>`)
+- **Gist**: copia di sicurezza e fonte da cui i dati esistenti vengono migrati al primo salvataggio
+
+I visitatori leggono da `/.netlify/functions/site-data`; se il server non risponde, il sito ricade sul Gist. `localStorage` (chiavi `mnt_settings`, `mnt_settings_en`, `mnt_catalog`, `mnt_reviews`, `mnt_seo`) fa solo da cache.
 
 ---
 
@@ -388,7 +389,7 @@ Il sito usa un'unica palette governata da variabili CSS (`--color-primary`, `--c
 - **Font:** Fraunces (titoli), Jost (testi ed etichette). Si cambiano dall'admin; tutti i font selezionabili sono già caricati in `src/index.css`.
 - **Stile grafico:** forme morbide, bordi netti con ombra piena, etichette a bollino, medaglione rotante nell'Hero, nastro scorrevole inclinato. Le regole sono raccolte in fondo a `src/index.css` (sezione "skin retrò pop").
 - **Immagini:** hero, "Il negozio", footer e sfondo recensioni sono opzionali; senza immagine si vede un'alternativa tipografica.
-- **Dati dell'admin:** salvati nel browser (`localStorage`) e, se configurato, sincronizzati con un GitHub Gist tramite la Netlify Function. I visitatori vedono i dati del Gist o quelli predefiniti in `AppContext.tsx`.
+- **Dati dell'admin:** salvati su Netlify Database e Blobs (con copia sul Gist), letti da tutti i visitatori; `localStorage` fa solo da cache. I valori predefiniti sono in `AppContext.tsx`.
 
 ---
 
@@ -427,20 +428,20 @@ Se il campo inglese è assente, viene mostrato il testo italiano come fallback.
 
 ## Personalizzazione tema
 
-Il tema è interamente controllato da CSS custom properties applicate dinamicamente da `App.tsx`:
+Il tema è controllato da CSS custom properties applicate dinamicamente da `App.tsx` a partire dai valori scelti nell'admin. Default del tema *Emporio 46*:
 
 | Variabile CSS | Default | Descrizione |
 |---|---|---|
-| `--color-primary` | `#e29a3d` | Ambra — accenti, bottoni, bordi |
-| `--color-bg` | `#0d0a08` | Sfondo principale |
-| `--color-bg-alt` | `#17110d` | Sfondo sezioni alternate |
-| `--color-bg-card` | `#211812` | Sfondo card, pannelli, input |
-| `--color-text` | `#f5ede0` | Testo principale |
-| `--color-text-muted` | `#9a8a78` | Testo secondario |
-| `--color-accent` | `#9a8a78` | Accento secondario |
-| `--color-overlay` | `rgba(10,8,5,0.72)` | Overlay su immagini |
-| `--font-display` | `'Playfair Display', serif` | Font titoli |
-| `--font-body` | `'Cormorant Garamond', serif` | Font corpo |
+| `--color-primary` | `#c4561f` | Arancio bruciato — accenti, bottoni, bordi |
+| `--color-bg` | `#f3e8d4` | Sfondo principale (carta crema) |
+| `--color-bg-alt` | `#eadcc2` | Sfondo sezioni alternate |
+| `--color-bg-card` | `#fbf4e6` | Sfondo card, pannelli, input |
+| `--color-text` | `#2b1a12` | Testo principale |
+| `--color-text-muted` | `#7b6454` | Testo secondario |
+| `--color-accent` | `#2f6f73` | Verde petrolio — accento secondario |
+| `--color-overlay` | `rgba(243,232,212,0.74)` | Overlay su immagini |
+| `--font-display` | `'Fraunces', serif` | Font titoli |
+| `--font-body` | `'Jost', sans-serif` | Font corpo ed etichette |
 
 Font aggiuntivi usati in componenti statici: **Cinzel** (navbar, label uppercase).
 
@@ -464,10 +465,10 @@ lenis      → chunk separato
 ```
 
 ### TypeScript
-Il progetto usa `@ts-nocheck` su file con pattern di alto dinamismo (`App.tsx`, `AdminPanel.tsx`, `AppContext.tsx`) per evitare falsi positivi sui tipi durante le iterazioni rapide. Il build Vite procede senza `tsc` separato.
+Alcuni file con pattern molto dinamici hanno `// @ts-nocheck` in testa (`AdminPanel`, `AppContext`, `App`, `Navbar`, `Cursor`, le sezioni e `armchair.ts`). Il build Vite procede senza `tsc` separato. Rimuovere `@ts-nocheck` file per file e correggere gli errori con `npx tsc --noEmit` è un lavoro di pulizia ancora da fare.
 
 ### Dati di default
-Catalogo (9 oggetti) e recensioni (9 voci) di esempio sono hardcodati in `AppContext.tsx` come fallback. Vengono caricati solo se il localStorage è vuoto.
+Catalogo (9 oggetti) e recensioni (9 voci) di esempio sono hardcodati in `AppContext.tsx` come fallback. Vengono usati solo se né il server né il Gist né la cache locale hanno dati.
 
 ---
 
@@ -562,7 +563,9 @@ Dal v72 **Gemini è l'unica IA** della *Perizia AI* e degli *articoli del catalo
 
 1. **Osservazione** — Gemini guarda la foto con il prontuario, le regole di onestà e i dati del titolare e produce una lettura strutturata.
 2. **Perizia** — Gemini la scrive a partire dalla lettura.
-3. **Revisione** — Gemini ricontrolla la perizia guardando di nuovo la foto, insieme ai controlli automatici in codice (intervallo di prezzo ≤ 2× per le classi A/B e ≤ 2,5× per la C, coerenza classe↔prezzo, realizzo 40–60%, sezioni obbligatorie, formato). Una correzione viene accettata solo se non peggiora il testo; i rilievi residui ricevono una riscrittura mirata.
+3. **Revisione** — Gemini ricontrolla la perizia guardando di nuovo la foto e segnala solo i problemi; se ce ne sono, una riscrittura mirata li corregge (accettata solo se non peggiora il testo). La revisione viene **saltata** per oggetti di classe A/B con fiducia alta e controlli automatici (intervallo ≤ 2×, coerenza classe↔prezzo, realizzo 40–60%, sezioni obbligatorie) già superati.
+
+I modelli sono usati in ordine (`gemini-3.8-flash` per primo): quelli successivi subentrano solo se il precedente è esaurito o non disponibile. L'osservazione usa ragionamento «medium».
 
 Sotto ogni perizia c'è un indicatore (revisione superata/corretta, note) e in fondo al testo il blocco «Revisione finale». Anche le **domande di approfondimento** (rilettura del dettaglio sulla foto) e il **suggerimento prezzo** usano Gemini.
 

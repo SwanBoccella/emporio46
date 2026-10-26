@@ -3,6 +3,7 @@ import { useRef, useState, useEffect } from 'react'
 import { motion, useInView, AnimatePresence } from 'framer-motion'
 import { useApp } from '../../context/AppContext'
 import SectionBackdrop from '../ui/SectionBackdrop'
+import { emailJsConfig } from '../../utils/emailjsConfig'
 import { waBookLink, waSearchLink, waEstimateLink } from '../../utils/whatsapp'
 import { REVEAL_VP } from '../../utils/reveal'
 
@@ -249,22 +250,15 @@ export default function ContactSection() {
     setErrorMsg('')
     setStatus('sending')
 
-    // Valori: variabili d'ambiente (se presenti) oppure pannello admin
-    const env = import.meta.env
-    const serviceId = ((env.VITE_EMAILJS_SERVICE as string) || settings.emailjsServiceId || '').trim()
-    const publicKey = ((env.VITE_EMAILJS_PUBLIC_KEY as string) || settings.emailjsPublicKey || '').trim()
-    // Un solo template per le notifiche al negozio (valido per tutte e 3 le schede).
-    // I campi legacy Request/Estimate vengono usati solo come fallback se il principale è vuoto.
-    const tplShop = ((env.VITE_EMAILJS_TEMPLATE as string) || settings.emailjsTemplateBook
-      || settings.emailjsTemplateRequest || settings.emailjsTemplateEstimate || '').trim()
-    const tplClient = ((env.VITE_EMAILJS_TEMPLATE_CLIENT as string) || settings.emailjsTemplateClient || '').trim()
+    // Configurazione EmailJS (variabili d'ambiente → pannello admin → valori predefiniti)
+    const { serviceId, publicKey, tplShop, tplClient, ready: emailReady } = emailJsConfig(settings)
 
-    // Se EmailJS non è configurato/attivo, apre WhatsApp
-    const emailReady = !!(serviceId && publicKey && tplShop) && (settings.emailjsEnabled || !!env.VITE_EMAILJS_SERVICE)
+    // Solo se EmailJS manca del tutto si ripiega su WhatsApp, e lo si dice chiaramente (niente falso "inviato")
     if (!emailReady) {
       window.open(waLinks[tab], '_blank')
       sendingRef.current = false
-      setStatus('success')
+      setErrorMsg(lang === 'it' ? '✗ Invio email non disponibile: ti abbiamo aperto WhatsApp per scriverci.' : '✗ Email sending is unavailable: we opened WhatsApp so you can write to us.')
+      setStatus('error')
       return
     }
 
@@ -295,6 +289,8 @@ export default function ContactSection() {
       params.is_en = lang === 'en' ? '1' : ''
       params.data_invio = new Date().toLocaleString(lang === 'en' ? 'en-GB' : 'it-IT', { dateStyle: 'full', timeStyle: 'short', timeZone: 'Europe/Rome' })
       params.shop_name = settings.siteName || 'Emporio 46'
+      params.shop_email = (settings.email || '').trim()
+      params.to_email = params.shop_email   // usabile nel template negozio come To Email = {{to_email}}
       params.shop_phone = settings.telefono || ''
       params.shop_address = [settings.indirizzo, settings.citta].filter(Boolean).join(', ')
       params.shop_maps = settings.mapsLink || ''
@@ -312,15 +308,25 @@ export default function ContactSection() {
 
       // 2) Conferma automatica al cliente (opzionale) — un suo fallimento NON deve annullare l'invio
       if (tplClient) {
-        try { await withTimeout(emailjs.send(serviceId, tplClient, params, publicKey)) }
-        catch (e) { console.warn('[EmailJS] conferma cliente non inviata:', e) }
+        // EmailJS accetta ~1 richiesta al secondo: si attende prima della seconda e si ritenta una volta
+        const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
+        await sleep(1300)
+        for (let tentativo = 0; tentativo < 2; tentativo++) {
+          try { await withTimeout(emailjs.send(serviceId, tplClient, params, publicKey)); break }
+          catch (e) {
+            const x = e as { status?: number; text?: string }
+            console.warn(`[EmailJS] conferma cliente non inviata (tentativo ${tentativo + 1}):`, x?.status, x?.text || e)
+            if (tentativo === 0) await sleep(2000)
+          }
+        }
       }
 
       resetForms()
       setStatus('success')
     } catch (e) {
       console.error('[EmailJS] invio fallito:', e)
-      setErrorMsg('')
+      const x = e as { status?: number; message?: string }
+      setErrorMsg(x?.message === 'timeout' ? (lang === 'it' ? '✗ Nessuna risposta dal servizio email. Riprova tra poco o scrivici su WhatsApp.' : '✗ The email service did not respond. Try again shortly or message us on WhatsApp.') : '')
       setStatus('error')
     } finally {
       sendingRef.current = false

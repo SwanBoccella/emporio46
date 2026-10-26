@@ -134,7 +134,7 @@ export interface Engine {
 }
 export const geminiEngine: Engine = {
   name: 'Gemini',
-  visionJson: (i, s, p, m) => geminiExpertVisionJson(i, s, p, m, 'high'),
+  visionJson: (i, s, p, m) => geminiExpertVisionJson(i, s, p, m, 'medium'),
   visionText: (i, s, p, m) => geminiExpertVisionText(i, s, p, m, 'medium'),
   text: (s, p, m, t = 'medium') => geminiExpertText(s, p, m, t),
 }
@@ -253,10 +253,10 @@ Controlla punto per punto, guardando la foto:
 4. Coerenza interna tra natura, classe, prezzo e fiducia.
 5. Formato: tutte le sezioni, intestazioni in **grassetto**, niente "###" né tabelle.
 
+Non riscrivere la perizia: elenca solo i problemi (la correzione la fa un passaggio successivo).
 Rispondi SOLO con un JSON valido:
 { "verdetto": "ok | da_correggere",
-  "problemi": [ { "gravita": "alta | media | bassa", "descrizione": "…" } ],
-  "testo_corretto": "se da_correggere: l'INTERA perizia riscritta nello stesso formato, cambiando solo ciò che serve; altrimenti null" }`
+  "problemi": [ { "gravita": "alta | media | bassa", "descrizione": "…" } ] }`
 }
 
 
@@ -303,22 +303,31 @@ export async function periziaAnalyze(image: string, contesto = '', opts: RunOpts
   const promptValuta = `OSSERVAZIONI SULLA FOTO (estratte da un analista che ha visto l'immagine):\n${obs}\n${contesto ? `\nINFORMAZIONI DEL TITOLARE (vincolanti, hanno la precedenza sulla foto):\n${contesto}\n` : ''}\nScrivi ora la perizia completa nel formato richiesto. Se le ipotesi hanno confidenza bassa o se l'oggetto è in classe D, applica il metodo di stima con prudenza.`
   let text = (await engine.text(SYSTEM_VALUTA, promptValuta, 1900)).trim()
 
-  // Revisione: Gemini ricontrolla guardando di nuovo la foto
+  // Revisione: Gemini ricontrolla guardando di nuovo la foto, ma solo quando serve.
+  // Si salta se i controlli automatici sono puliti, la fiducia è alta e l'oggetto è di classe A o B (basso valore).
   let rilievi = controllaPerizia(text)
-  step('Gemini ricontrolla la perizia sulla foto…')
-  try {
-    const v = await engine.visionJson(image, SYSTEM_VERIFICA, promptVerifica(obs, text, contesto, rilievi), 3400)
-    meta.verificatore = 'Gemini'
-    meta.verifica = 'ok'
-    const problemi: string[] = (Array.isArray(v?.problemi) ? v.problemi : []).map((p: any) => clip(typeof p === 'string' ? p : p?.descrizione, 220)).filter(Boolean)
-    const cand = typeof v?.testo_corretto === 'string' ? v.testo_corretto.trim() : ''
-    if (v?.verdetto === 'da_correggere' && cand.length > 400) {
-      const dopo = controllaPerizia(cand)
-      if (dopo.length <= rilievi.length) { text = cand; meta.verifica = 'corretta'; meta.problemi = problemi; rilievi = dopo }
-      else meta.avvisi.push('La correzione proposta dalla revisione è stata scartata perché peggiorava il formato o la stima.')
+  const classe = classeDi(text)
+  const fiduciaAlta = /fiducia\W{0,4}\s*alta/i.test(text)
+  if (!rilievi.length && fiduciaAlta && (classe === 'A' || classe === 'B')) {
+    meta.verifica = 'non-eseguita'
+    meta.avvisi.push('Revisione sulla foto non necessaria: controlli automatici superati, fiducia alta, oggetto di basso valore.')
+  } else {
+    step('Gemini ricontrolla la perizia sulla foto…')
+    try {
+      const v = await engine.visionJson(image, SYSTEM_VERIFICA, promptVerifica(obs, text, contesto, rilievi), 1200)
+      meta.verificatore = 'Gemini'
+      meta.verifica = 'ok'
+      const problemi: string[] = (Array.isArray(v?.problemi) ? v.problemi : []).map((p: any) => clip(typeof p === 'string' ? p : p?.descrizione, 220)).filter(Boolean)
+      if (v?.verdetto === 'da_correggere' && problemi.length) {
+        step('Gemini corregge la perizia…')
+        const cand = await riscrivi(engine, text, problemi, obs, contesto)
+        const dopo = controllaPerizia(cand)
+        if (cand.length > 400 && dopo.length <= rilievi.length) { text = cand; meta.verifica = 'corretta'; meta.problemi = problemi; rilievi = dopo }
+        else meta.avvisi.push('La correzione proposta dalla revisione è stata scartata perché peggiorava il formato o la stima.')
+      }
+    } catch (e) {
+      meta.avvisi.push(`Revisione finale non riuscita: ${errMsg(e)}`)
     }
-  } catch (e) {
-    meta.avvisi.push(`Revisione finale non riuscita: ${errMsg(e)}`)
   }
 
   // Se restano rilievi dei controlli automatici, una sola riscrittura mirata

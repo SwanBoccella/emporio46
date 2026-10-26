@@ -52,22 +52,30 @@ assert.deepEqual(log, ['visionJson', 'text', 'visionJson'])
 assert.ok(/\*\*Revisione finale\*\*/.test(r.text) && /Gemini/.test(r.text) && !/Groq/.test(r.text))
 console.log('3 ok flusso')
 
-// 4. la revisione corregge una stima troppo larga (testo corretto accettato solo se migliora)
-r = await P.periziaAnalyze('img', '', { engine: mk({
-  visionJson: async (i, s) => isVerifica(s) ? { verdetto: 'da_correggere', problemi: [{ gravita: 'alta', descrizione: 'intervallo troppo largo' }], testo_corretto: PERIZIA } : obsA(),
-  text: async () => BAD,
+// 4. la revisione segnala i problemi e la correzione parte da una riscrittura mirata (accettata solo se migliora)
+let calls = 0
+let r4 = await P.periziaAnalyze('img', '', { engine: mk({
+  visionJson: async (i, s) => isVerifica(s) ? { verdetto: 'da_correggere', problemi: [{ gravita: 'alta', descrizione: 'intervallo troppo largo' }] } : obsA(),
+  text: async () => (++calls === 1 ? BAD : PERIZIA),
 }) })
-assert.equal(r.meta.verifica, 'corretta'); assert.ok(/€ 300 – € 500/.test(r.text)); assert.ok(!/€ 100 – € 900/.test(r.text)); assert.equal(r.meta.problemi.length, 1)
+assert.equal(r4.meta.verifica, 'corretta'); assert.ok(/€ 300 – € 500/.test(r4.text)); assert.ok(!/€ 100 – € 900/.test(r4.text)); assert.equal(r4.meta.problemi.length, 1)
 console.log('4 ok correzione')
 
 // 5. correzione peggiore -> scartata; rilievi automatici -> riscrittura mirata
-let calls = 0
+calls = 0
 r = await P.periziaAnalyze('img', '', { engine: mk({
-  visionJson: async (i, s) => isVerifica(s) ? { verdetto: 'da_correggere', problemi: [], testo_corretto: BAD.replace('**Note commerciali**', 'x') } : obsA(),
-  text: async () => (++calls === 1 ? BAD : PERIZIA),
+  visionJson: async (i, s) => isVerifica(s) ? { verdetto: 'da_correggere', problemi: [{ gravita: 'media', descrizione: 'x' }] } : obsA(),
+  text: async () => (++calls === 1 ? BAD : calls === 2 ? '**Identificazione** — x' : PERIZIA),
 }) })
 assert.ok(/€ 300 – € 500/.test(r.text), 'la riscrittura mirata deve sistemare la stima'); assert.ok(r.meta.avvisi.some(a => /scartata/.test(a)))
 console.log('5 ok scarto + riscrittura')
+
+// 5b. oggetto di basso valore, fiducia alta, controlli puliti -> revisione sulla foto saltata
+log.length = 0
+const SEMPLICE = PERIZIA.replace(/Classe di valore\*\* — [A-D]/, 'Classe di valore** — B').replace(/Fiducia: \w+/, 'Fiducia: alta')
+r = await P.periziaAnalyze('img', '', { engine: mk({ visionJson: async (i, s) => isVerifica(s) ? { verdetto: 'ok', problemi: [] } : obsA(), text: async () => SEMPLICE }) })
+assert.deepEqual(log, ['visionJson', 'text']); assert.ok(r.meta.avvisi.some(a => /non necessaria/.test(a)))
+console.log('5b ok revisione saltata')
 
 // 6. revisione che fallisce -> la perizia c'è comunque, dichiarato
 r = await P.periziaAnalyze('img', '', { engine: mk({
