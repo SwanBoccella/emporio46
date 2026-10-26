@@ -1,7 +1,7 @@
 {
   "name": "emporio-46",
   "private": true,
-  "version": "71.0.0",
+  "version": "72.0.0",
   "type": "module",
   "engines": {
     "node": ">=18.0.0",
@@ -13,8 +13,8 @@
     "preview": "vite preview",
     "test:groq": "node --experimental-strip-types tests/groq.test.mjs",
     "test:gemini": "node --experimental-strip-types --import ./tests/_resolve.mjs tests/gemini.test.mjs",
-    "test:duo": "node --experimental-strip-types --import ./tests/_resolve.mjs tests/duo.test.mjs",
-    "test": "npm run test:groq && npm run test:gemini && npm run test:duo"
+    "test:perizia": "node --experimental-strip-types --import ./tests/_resolve.mjs tests/perizia.test.mjs",
+    "test": "npm run test:groq && npm run test:gemini && npm run test:perizia"
   },
   "dependencies": {
     "@emailjs/browser": "^4.3.3",

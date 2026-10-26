@@ -3,9 +3,9 @@ import React, { useState, useRef, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useApp } from '../../context/AppContext'
 import type { SiteSettings, SeoData } from '../../context/AppContext'
-import { groqText, groqJson, groqVision, extractJson, testGroq, groqDiagnose, getGroqKey, setGroqKey, isValidGroqKey, getModelOverride, setModelOverride, DEFAULT_TEXT_MODELS, DEFAULT_VISION_MODELS, type GroqTestResult } from '../../utils/groq'
+import { groqText, groqVision, extractJson, testGroq, groqDiagnose, getGroqKey, setGroqKey, isValidGroqKey, getModelOverride, setModelOverride, DEFAULT_TEXT_MODELS, DEFAULT_VISION_MODELS, type GroqTestResult } from '../../utils/groq'
 import { periziaAnalyze, periziaFollowUp, periziaPrezzo, schedaDaFoto, datiTitolare, isSoloDomanda, type PeriziaMeta } from '../../utils/perizia'
-import { testGemini, geminiDiagnose, getGeminiKey, setGeminiKey, isValidGeminiKey, getGeminiModelOverride, setGeminiModelOverride, DEFAULT_GEMINI_MODELS, type GeminiTestResult } from '../../utils/gemini'
+import { testGemini, geminiDiagnose, geminiText, geminiVision, geminiJson, getGeminiKey, setGeminiKey, isValidGeminiKey, getGeminiModelOverride, setGeminiModelOverride, DEFAULT_GEMINI_MODELS, type GeminiTestResult } from '../../utils/gemini'
 import { adminLogin, clearAdminToken, getAdminToken, changeAdminPassword, adminUploadAsset } from '../../utils/adminApi'
 import { footerGlassStyle, FOOTER_GLASS_DEFAULTS } from '../../utils/footerGlass'
 import { THEME_PRESETS, SECTION_BG_LABELS, SECTION_BG_GROUPS, SECTION_BG_HAS_TEXT, SECTION_BG_DEFAULTS, getSectionBg, buildMapsEmbed, SYNC_STATUS } from '../../context/AppContext'
@@ -181,7 +181,7 @@ function GroqKeyPanel({ onToast }: { onToast: (msg: string) => void }) {
 
   return (
     <div style={{ ...cardStyle, border: '1px solid rgba(111,207,151,0.2)' }}>
-      <p style={{ ...labelStyle, color: '#6fcf97', marginBottom: '0.5rem' }}>🤖 CHIAVE API GROQ (AI)</p>
+      <p style={{ ...labelStyle, color: '#6fcf97', marginBottom: '0.5rem' }}>🤖 CHIAVE API GROQ (altri testi: SEO, traduzioni, recensioni…)</p>
       <p style={{ fontFamily: 'Cormorant Garamond, serif', color: '#9a8a78', fontSize: '0.85rem', marginBottom: '1rem' }}>
         Crea una chiave gratuita su <strong style={{ color: '#c9a84c' }}>console.groq.com</strong> → API Keys → Create key. Se su Netlify è impostata <strong style={{ color: '#c9a84c' }}>GROQ_API_KEY</strong> (consigliato) non serve inserire nulla qui: l'AI funziona su ogni dispositivo dopo il login. Una chiave inserita qui vale solo in questo browser e ha la precedenza.
       </p>
@@ -255,9 +255,9 @@ function GeminiKeyPanel({ onToast }: { onToast: (msg: string) => void }) {
 
   return (
     <div style={{ ...cardStyle, border: '1px solid rgba(111,207,151,0.2)' }}>
-      <p style={{ ...labelStyle, color: '#6fcf97', marginBottom: '0.5rem' }}>✦ CHIAVE API GEMINI (seconda IA)</p>
+      <p style={{ ...labelStyle, color: '#6fcf97', marginBottom: '0.5rem' }}>✦ CHIAVE API GEMINI (Perizia AI e catalogo)</p>
       <p style={{ fontFamily: 'Cormorant Garamond, serif', color: '#9a8a78', fontSize: '0.85rem', marginBottom: '1rem' }}>
-        Gemini e Groq analizzano ogni oggetto <strong style={{ color: '#c9a84c' }}>insieme</strong>: ognuno guarda la foto per conto suo, poi Gemini confronta le due letture, e l'IA che non ha scritto la perizia la ricontrolla. Crea una chiave gratuita su <strong style={{ color: '#c9a84c' }}>aistudio.google.com/apikey</strong>. Se su Netlify è impostata <strong style={{ color: '#c9a84c' }}>GEMINI_API_KEY</strong> (consigliato) non serve inserire nulla qui. Una chiave inserita qui vale solo in questo browser e ha la precedenza. Se Gemini non è disponibile l'analisi prosegue con la sola Groq, e viceversa.
+        Gemini fa la <strong style={{ color: '#c9a84c' }}>Perizia AI</strong> (analisi della foto, stima, revisione) e genera testi, descrizioni da foto e prezzi degli <strong style={{ color: '#c9a84c' }}>articoli del catalogo</strong>. Crea una chiave gratuita su <strong style={{ color: '#c9a84c' }}>aistudio.google.com/apikey</strong>. Se su Netlify è impostata <strong style={{ color: '#c9a84c' }}>GEMINI_API_KEY</strong> (consigliato) non serve inserire nulla qui. Una chiave inserita qui vale solo in questo browser e ha la precedenza.
       </p>
       <div style={{ display: 'flex', gap: 6, marginBottom: '0.5rem' }}>
         <input
@@ -300,7 +300,7 @@ function GeminiKeyPanel({ onToast }: { onToast: (msg: string) => void }) {
 // ─── AI Assist Button ─────────────────────────────────────────────────────────
 function AiBtn({ loading, onClick, label = '✦ AI' }: { loading: boolean; onClick: () => void; label?: string }) {
   return (
-    <button onClick={onClick} disabled={loading} title="Assistenza AI (Groq)" style={{ background: loading ? 'rgba(111,207,151,0.08)' : 'rgba(111,207,151,0.12)', border: '1px solid rgba(111,207,151,0.35)', color: loading ? '#9a8a78' : '#6fcf97', fontFamily: 'Cinzel, serif', fontSize: '0.44rem', letterSpacing: '0.15em', padding: '0.3rem 0.6rem', cursor: loading ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s', flexShrink: 0 }}>
+    <button onClick={onClick} disabled={loading} title="Assistenza AI" style={{ background: loading ? 'rgba(111,207,151,0.08)' : 'rgba(111,207,151,0.12)', border: '1px solid rgba(111,207,151,0.35)', color: loading ? '#9a8a78' : '#6fcf97', fontFamily: 'Cinzel, serif', fontSize: '0.44rem', letterSpacing: '0.15em', padding: '0.3rem 0.6rem', cursor: loading ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s', flexShrink: 0 }}>
       {loading ? '⏳' : label}
     </button>
   )
@@ -1699,16 +1699,14 @@ function OrariAdmin() {
   )
 }
 
-// Esito della doppia IA sotto la perizia: accordo, revisione e note, a colpo d'occhio
+// Esito della revisione sotto la perizia, a colpo d'occhio
 function PeriziaBadge({ meta }: { meta: PeriziaMeta }) {
-  const col = meta.accordo === 'alto' ? '#6fcf97' : meta.accordo === 'medio' ? '#e2b93b' : meta.accordo === 'basso' ? '#eb5757' : '#9a8a78'
-  const modo = meta.modo === 'duo' ? 'Gemini + Groq' : meta.modo === 'solo-gemini' ? 'solo Gemini' : 'solo Groq'
+  const col = meta.verifica === 'ok' ? '#6fcf97' : meta.verifica === 'corretta' ? '#e2b93b' : '#9a8a78'
   const txt = [
-    modo,
-    meta.accordo ? `accordo ${meta.accordo}` : '',
+    'Gemini',
     meta.verifica === 'corretta' ? 'perizia corretta in revisione' : meta.verifica === 'ok' ? 'revisione superata' : 'senza revisione',
-  ].filter(Boolean).join(' · ')
-  const note = [...meta.discrepanze.filter(d => !d.risolta).map(d => `Da verificare — ${d.campo}`), ...meta.avvisi]
+  ].join(' · ')
+  const note = [...meta.avvisi]
   return (
     <div style={{ marginTop: 5, fontFamily: 'Cinzel, serif', fontSize: '0.38rem', letterSpacing: '0.12em', color: col, textTransform: 'uppercase' }}>
       ● {txt}
@@ -1885,7 +1883,7 @@ function MediaAdmin() {
     try {
       const hist = activeItem.chat.filter(m => !m.text.startsWith('⚠'))
         .map(m => `${m.role === 'user' ? 'Admin' : 'Perito AI'}: ${m.text}`).join('\n\n').slice(-7000)
-      const parsed = await groqJson<any>(`Sei un esperto italiano di vintage e modernariato e scrivi le schede del catalogo di un negozio (Emporio 46, Firenze: arredi vintage e bijoux).
+      const parsed = await geminiJson<any>(`Sei un esperto italiano di vintage e modernariato e scrivi le schede del catalogo di un negozio (Emporio 46, Firenze: arredi vintage e bijoux).
 Qui sotto trovi la perizia di un oggetto e la conversazione con l'amministratore. Se l'admin ha corretto qualcosa, vale la sua correzione.
 
 ${hist}
@@ -2036,7 +2034,7 @@ Compila la scheda catalogo. Rispondi SOLO con un JSON valido (niente altro testo
             {/* Header chat */}
             <div style={{ padding: '0.8rem 1.2rem', borderBottom: '1px solid rgba(201,168,76,0.1)', display: 'flex', alignItems: 'center', gap: '0.6rem', flexShrink: 0 }}>
               <span style={{ color: '#6fcf97', fontSize: '0.8rem' }}>✦</span>
-              <span style={{ fontFamily: 'Cinzel, serif', fontSize: '0.48rem', letterSpacing: '0.2em', color: '#c9a84c', textTransform: 'uppercase' }}>Perizia AI · Gemini + Groq</span>
+              <span style={{ fontFamily: 'Cinzel, serif', fontSize: '0.48rem', letterSpacing: '0.2em', color: '#c9a84c', textTransform: 'uppercase' }}>Perizia AI · Gemini</span>
               {loading && <span style={{ fontFamily: 'Cormorant Garamond, serif', color: '#6fcf97', fontSize: '0.82rem', fontStyle: 'italic', marginLeft: 'auto' }}>{step || 'Analisi approfondita in corso'} (1–2 min)…</span>}
             </div>
 
@@ -2113,7 +2111,7 @@ Compila la scheda catalogo. Rispondi SOLO con un JSON valido (niente altro testo
           <div style={{ textAlign: 'center' }}>
             <p style={{ fontFamily: 'Playfair Display, serif', color: '#6a5a4a', fontSize: '1.3rem', marginBottom: '0.75rem' }}>✦ Perizia AI</p>
             <p style={{ fontFamily: 'Cormorant Garamond, serif', color: '#4a3a2a', fontSize: '0.95rem', fontStyle: 'italic', maxWidth: 360 }}>
-              Carica un'immagine di un oggetto vintage o d'epoca. Gemini e Groq lo analizzeranno insieme, ognuno per conto suo, poi confronteranno le letture e ricontrolleranno la perizia — epoca, materiali, qualità, stima di prezzo. Puoi poi correggere o approfondire in chat.
+              Carica un'immagine di un oggetto vintage o d'epoca. Gemini lo analizzerà e poi ricontrollerà la perizia sulla foto — epoca, materiali, qualità, stima di prezzo. Puoi poi correggere o approfondire in chat.
             </p>
             <button onClick={() => inputRef.current?.click()} style={{ ...btnGold, marginTop: '1.5rem' }}>+ Carica prima immagine</button>
           </div>
@@ -2297,7 +2295,7 @@ function CatalogAdmin() {
   const aiAnalyzeImage = async (src: string) => {
     setAiLoading(p => ({ ...p, image: true }))
     try {
-      // Doppia IA: Gemini e Groq guardano la foto, Gemini riconcilia, la scheda nasce dalla lettura comune (e la stima è tenuta entro 2×)
+      // Gemini guarda la foto e compila la scheda (la stima è tenuta entro 2×)
       const { scheda: parsed, meta } = await schedaDaFoto(src, '')
       setAiSuggestions(parsed)
       // Sovrascrive tutti i campi con i valori AI (l'admin può modificarli dopo)
@@ -2311,7 +2309,7 @@ function CatalogAdmin() {
         // non sovrascrive un prezzo già inserito a mano
         prezzo: (!prev.prezzo || /su richiesta/i.test(String(prev.prezzo))) ? (parsed.prezzo_suggerito || prev.prezzo) : prev.prezzo,
       }))
-      showToast(`✦ ${meta.modo === 'duo' ? 'Gemini + Groq hanno' : 'AI ha'} analizzato l'immagine${meta.accordo ? ` · accordo ${meta.accordo}` : ''} — campi compilati ✓${meta.accordo === 'basso' ? ' · controlla bene i dati' : ''}`)
+      showToast(`✦ Gemini ha analizzato l'immagine — campi compilati ✓${meta.avvisi.length ? ' · ' + meta.avvisi[0].slice(0, 90) : ''}`)
     } catch (e) {
       showToast(aiErr(e))
     }
@@ -2339,9 +2337,9 @@ function CatalogAdmin() {
       if (imgs.length > 0) {
         // Usa vision se c'è la foto
         const ctx = [nome && `Nome: ${nome}`, era && `Periodo: ${era}`, cat && `Categoria: ${cat}`, desc && `Descrizione attuale: ${desc}`].filter(Boolean).join(', ')
-        result = await groqVision(imgs[0], `Sei un esperto negozio vintage. ${ctx ? `Informazioni sull'oggetto: ${ctx}. ` : ''}Guarda la foto e scrivi una descrizione commerciale elegante e accattivante. Rispondi con SOLO la descrizione migliorata (2-3 frasi, max 250 caratteri, in italiano elegante), senza spiegazioni.`)
+        result = await geminiVision(imgs[0], `Sei un esperto negozio vintage. ${ctx ? `Informazioni sull'oggetto: ${ctx}. ` : ''}Guarda la foto e scrivi una descrizione commerciale elegante e accattivante. Rispondi con SOLO la descrizione migliorata (2-3 frasi, max 250 caratteri, in italiano elegante), senza spiegazioni.`)
       } else {
-        result = await groqText(`Sei un esperto negozio vintage. Scrivi una descrizione commerciale elegante e accattivante per questo oggetto vintage o d'epoca:
+        result = await geminiText(`Sei un esperto negozio vintage. Scrivi una descrizione commerciale elegante e accattivante per questo oggetto vintage o d'epoca:
 - Nome: ${nome || '(non specificato)'}
 - Periodo: ${era || '(non specificato)'}
 - Categoria: ${cat}
@@ -2412,7 +2410,7 @@ Regole:
     try {
       const nome = (form.nome as string) || ''
       const extra = nome ? `L'oggetto si chiama "${nome}". ` : ''
-      const result = await groqVision(imgs[0], `${extra}Sei un esperto negozio vintage con 30 anni di esperienza. Guarda questa foto e scrivi una descrizione commerciale elegante per un'negozio vintage. Rispondi SOLO con la descrizione (2-4 frasi, max 300 caratteri, in italiano raffinato), niente altro testo.`)
+      const result = await geminiVision(imgs[0], `${extra}Sei un esperto negozio vintage con 30 anni di esperienza. Guarda questa foto e scrivi una descrizione commerciale elegante per un'negozio vintage. Rispondi SOLO con la descrizione (2-4 frasi, max 300 caratteri, in italiano raffinato), niente altro testo.`)
       if (result) f('descrizione')(result.replace(/^["']+|["']+$/g, '').trim())
       showToast('✦ Descrizione generata dalla foto ✓')
     } catch (e: any) {
@@ -2482,7 +2480,7 @@ Regole:
       setBulkProgress({ done: i, total: targets.length, current: item.nome })
       try {
         const ctx = [item.nome && `Nome: ${item.nome}`, item.era && `Periodo: ${item.era}`, item.categoria && `Categoria: ${item.categoria}`, item.descrizione && `Descrizione attuale: ${item.descrizione}`].filter(Boolean).join(', ')
-        const text = await groqVision(item.img || item.images![0], `Sei un esperto di un negozio vintage italiano. Informazioni note: ${ctx}. Guarda la foto e scrivi una descrizione commerciale elegante di 2-3 frasi (max 260 caratteri, in italiano). Mantieni le informazioni già note e descrivi solo ciò che si vede (forma, materiali, colori, stile). NON inventare marchi, date, firme o misure non visibili. Rispondi con SOLO la descrizione.`, 500)
+        const text = await geminiVision(item.img || item.images![0], `Sei un esperto di un negozio vintage italiano. Informazioni note: ${ctx}. Guarda la foto e scrivi una descrizione commerciale elegante di 2-3 frasi (max 260 caratteri, in italiano). Mantieni le informazioni già note e descrivi solo ciò che si vede (forma, materiali, colori, stile). NON inventare marchi, date, firme o misure non visibili. Rispondi con SOLO la descrizione.`, 500)
         const desc = text.replace(/^["'«“]+|["'»”]+$/g, '').trim()
         if (!desc) throw new Error('vuota')
         updated = updated.map(c => c.id === item.id ? { ...c, descrizione: desc, descrizioneEn: undefined } : c)
@@ -2661,7 +2659,7 @@ Regole:
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(111,207,151,0.08)', border: '1px solid rgba(111,207,151,0.2)', padding: '0.3rem 0.7rem', flexShrink: 0 }}>
                   <span style={{ color: '#6fcf97', fontSize: '0.7rem' }}>✦</span>
-                  <span style={{ fontFamily: 'Cinzel, serif', fontSize: '0.42rem', letterSpacing: '0.15em', color: '#6fcf97' }}>GEMINI + GROQ</span>
+                  <span style={{ fontFamily: 'Cinzel, serif', fontSize: '0.42rem', letterSpacing: '0.15em', color: '#6fcf97' }}>GEMINI</span>
                 </div>
               </div>
 

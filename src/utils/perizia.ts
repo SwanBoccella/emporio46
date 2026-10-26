@@ -1,7 +1,7 @@
-// ─── Perizia AI: doppia IA (Gemini + Groq) coordinata, con prontuario del settore ────────────
-// Le fasi (osservazione, riconciliazione, perizia, revisione) sono descritte più sotto, nel blocco "DOPPIA IA".
-// Qui in alto: prontuario di riconoscimento, metodo di stima e regole di onestà, condivisi da entrambe le IA.
-import { groqExpertVisionJson, groqExpertVisionText, groqExpertText, extractJson } from './groq'
+// ─── Perizia AI: Gemini (unica IA), con prontuario del settore ───────────────────────────────
+// Le fasi (osservazione, perizia, revisione) sono descritte più sotto, nel blocco "PERIZIA AI".
+// Qui in alto: prontuario di riconoscimento, metodo di stima e regole di onestà.
+import { extractJson } from './groq'
 import { geminiExpertVisionJson, geminiExpertVisionText, geminiExpertText } from './gemini'
 
 export const PRONTUARIO = `PRONTUARIO DI RICONOSCIMENTO (promemoria di lavoro: usalo per ragionare, non recitarlo)
@@ -116,21 +116,18 @@ FORMATO DELLA RISPOSTA (italiano, niente "###" né tabelle; intestazioni in **gr
 **Note commerciali** — come presentarlo e a chi proporlo, in 1-2 frasi.`
 
 // ═════════════════════════════════════════════════════════════════════════════
-// DOPPIA IA: Gemini + Groq coordinati
+// PERIZIA AI: solo Gemini
 // ─────────────────────────────────────────────────────────────────────────────
-// 1) OSSERVAZIONE  Gemini e Groq guardano la foto IN PARALLELO e in modo indipendente (stesso metodo, stesso prontuario).
-// 2) RICONCILIAZIONE  Gemini fa da arbitro: rivede la foto dove le due letture divergono (categoria, natura, scritte, autore),
-//    tiene solo ciò che legge davvero e, nei casi dubbi, sceglie la lettura più prudente. Un confronto automatico a parte
-//    (confronta) misura l'accordo e impedisce all'arbitro di dichiararlo più alto di quanto sia.
-// 3) PERIZIA  la scrive Groq (testo) a partire dalle osservazioni riconciliate; se Groq manca la scrive Gemini.
-// 4) REVISIONE  l'IA che NON ha scritto la perizia la ricontrolla guardando la foto, insieme a controlli automatici
-//    (intervalli di prezzo, classe di valore, realizzo, sezioni obbligatorie). Se trova errori la perizia viene corretta.
-// Se una delle due IA non è disponibile (chiave mancante, quota, modello dismesso) si prosegue con l'altra, dichiarandolo.
+// 1) OSSERVAZIONE  Gemini guarda la foto con il prontuario, le regole di onestà e i dati del titolare e produce una lettura strutturata.
+// 2) PERIZIA  Gemini scrive la perizia a partire da quella lettura.
+// 3) REVISIONE  Gemini ricontrolla la perizia guardando di nuovo la foto, insieme a controlli automatici (intervalli di prezzo,
+//    classe di valore, realizzo, sezioni obbligatorie). Se trova errori la perizia viene corretta.
+// Groq non è più coinvolto: resta solo per gli altri testi del pannello (SEO, traduzioni, recensioni…).
 // ═════════════════════════════════════════════════════════════════════════════
 
 export type Think = 'low' | 'medium' | 'high'
 export interface Engine {
-  name: 'Gemini' | 'Groq'
+  name: 'Gemini'
   visionJson(image: string, system: string, prompt: string, maxTokens: number): Promise<any>
   visionText(image: string, system: string, prompt: string, maxTokens: number): Promise<string>
   text(system: string, prompt: string, maxTokens: number, think?: Think): Promise<string>
@@ -141,27 +138,15 @@ export const geminiEngine: Engine = {
   visionText: (i, s, p, m) => geminiExpertVisionText(i, s, p, m, 'medium'),
   text: (s, p, m, t = 'medium') => geminiExpertText(s, p, m, t),
 }
-export const groqEngine: Engine = {
-  name: 'Groq',
-  visionJson: (i, s, p, m) => groqExpertVisionJson(i, s, p, m),
-  visionText: (i, s, p, m) => groqExpertVisionText(i, s, p, m),
-  text: (s, p, m, t = 'medium') => groqExpertText(s, p, m, t),
-}
-export const defaultEngines = (): Engine[] => [geminiEngine, groqEngine]
 
-export type Accordo = 'alto' | 'medio' | 'basso'
-export interface Discrepanza { campo: string; gemini: string; groq: string; verdetto: string; risolta: boolean }
 export interface PeriziaMeta {
-  modo: 'duo' | 'solo-gemini' | 'solo-groq'
-  accordo?: Accordo
-  discrepanze: Discrepanza[]
   verifica: 'ok' | 'corretta' | 'non-eseguita'
   verificatore?: string
   problemi: string[]   // rilievi trovati dalla revisione (anche quelli già corretti)
   avvisi: string[]     // limiti incontrati durante il lavoro
 }
 export interface PeriziaResult { text: string; obs: string; meta?: PeriziaMeta }
-export interface RunOpts { engines?: Engine[]; onStep?: (s: string) => void }
+export interface RunOpts { engine?: Engine; onStep?: (s: string) => void }
 
 const errMsg = (e: unknown) => ((e as Error)?.message || String(e) || 'errore').replace(/\s+/g, ' ').slice(0, 220)
 const clip = (v: unknown, n = 240) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, n)
@@ -169,47 +154,6 @@ const clip = (v: unknown, n = 240) => String(v ?? '').replace(/\s+/g, ' ').trim(
 function fmtObs(o: any): string {
   try { return JSON.stringify(o, null, 1).slice(0, 9000) } catch { return String(o) }
 }
-
-// ─── Confronto automatico tra le due letture ─────────────────────────────────
-const N = (s: unknown) => String(s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim()
-const isNone = (t: string) => !t || /^(nessun|null$|nulla|non leggibil|non determinabil|assent|n a$|sconosciut|ignot)/.test(t)
-const tokens = (t: string, min = 3) => new Set(t.split(' ').filter(w => w.length >= min))
-function jaccard(a: string, b: string) {
-  const A = tokens(a, 2), B = tokens(b, 2)
-  if (!A.size || !B.size) return 0
-  let inter = 0; A.forEach(w => { if (B.has(w)) inter++ })
-  return inter / (A.size + B.size - inter)
-}
-
-export interface Confronto {
-  macro: boolean; natura: boolean
-  autore: 'uguale' | 'diverso' | 'una-sola' | 'nessuno'
-  scritte: 'uguali' | 'diverse' | 'una-sola' | 'nessuna'
-  livello: Accordo
-  diffs: { campo: string; gemini: string; groq: string }[]
-}
-export function confronta(a: any, b: any): Confronto {
-  const macro = N(a?.macro_categoria) === N(b?.macro_categoria)
-  const natura = N(a?.natura) === N(b?.natura)
-  const ta = N(a?.ipotesi?.[0]?.autore_o_marca), tb = N(b?.ipotesi?.[0]?.autore_o_marca)
-  const na = isNone(ta), nb = isNone(tb)
-  const autore: Confronto['autore'] = na && nb ? 'nessuno' : na !== nb ? 'una-sola'
-    : [...tokens(ta, 4)].some(w => tokens(tb, 4).has(w)) || ta === tb ? 'uguale' : 'diverso'
-  const sa = N(a?.scritte_marchi_firme), sb = N(b?.scritte_marchi_firme)
-  const xa = isNone(sa), xb = isNone(sb)
-  const scritte: Confronto['scritte'] = xa && xb ? 'nessuna' : xa !== xb ? 'una-sola' : jaccard(sa, sb) >= 0.5 ? 'uguali' : 'diverse'
-  const diffs: Confronto['diffs'] = []
-  if (!macro) diffs.push({ campo: 'categoria', gemini: clip(a?.macro_categoria, 60), groq: clip(b?.macro_categoria, 60) })
-  if (!natura) diffs.push({ campo: 'natura/autenticità', gemini: clip(a?.natura, 60), groq: clip(b?.natura, 60) })
-  if (autore === 'diverso' || autore === 'una-sola') diffs.push({ campo: 'autore/marca', gemini: clip(a?.ipotesi?.[0]?.autore_o_marca) || 'nessuno', groq: clip(b?.ipotesi?.[0]?.autore_o_marca) || 'nessuno' })
-  if (scritte === 'diverse' || scritte === 'una-sola') diffs.push({ campo: 'scritte/marchi', gemini: clip(a?.scritte_marchi_firme) || 'nessuna', groq: clip(b?.scritte_marchi_firme) || 'nessuna' })
-  const livello: Accordo = !macro || autore === 'diverso' || scritte === 'diverse' ? 'basso'
-    : !natura || autore === 'una-sola' || scritte === 'una-sola' ? 'medio' : 'alto'
-  return { macro, natura, autore, scritte, livello, diffs }
-}
-const RANK: Record<Accordo, number> = { basso: 0, medio: 1, alto: 2 }
-const minAccordo = (a: Accordo, b?: Accordo): Accordo => (b && RANK[b] < RANK[a] ? b : a)
-const asAccordo = (v: unknown): Accordo | undefined => { const t = N(v); return t === 'alto' || t === 'medio' || t === 'basso' ? t : undefined }
 
 // ─── Controlli automatici sulla stima (deterministici: non dipendono da nessuna IA) ─────────
 const toNum = (s: string): number => {
@@ -281,45 +225,9 @@ export function restringiRange(min: number, max: number, lim = 2): [number, numb
 const euro = (n: number) => '€ ' + n.toLocaleString('it-IT')
 export function fmtRange([a, b]: [number, number]) { return a === b ? euro(a) : `${euro(a)} – ${euro(b)}` }
 
-// ─── Prompt di riconciliazione e di revisione ────────────────────────────────
-const SYSTEM_ARBITRO = `Sei un perito italiano con trent'anni di esperienza in antiquariato, modernariato, design, arte moderna e contemporanea, gioielleria, numismatica, moda vintage e oggettistica. Lavori per un negozio di Firenze (arredi vintage e bijoux).
 
-${PRONTUARIO}
-
-${REGOLE_ONESTA}
-
-${REGOLE_TITOLARE}
-
-Il tuo compito ORA è fare da ARBITRO tra due analisti che hanno osservato la stessa foto in modo indipendente. Non stimare prezzi.`
-
-function promptArbitro(a: any, b: any, cmp: Confronto, contesto: string) {
-  return `LETTURA A (analista Gemini):
-${fmtObs(a)}
-
-LETTURA B (analista Groq):
-${fmtObs(b)}
-
-SEGNALI AUTOMATICI DI CONFRONTO: categoria ${cmp.macro ? 'uguale' : 'DIVERSA'} · natura ${cmp.natura ? 'uguale' : 'DIVERSA'} · autore/marca ${cmp.autore} · scritte ${cmp.scritte}.
-${contesto ? `\nINFORMAZIONI DEL TITOLARE (vincolanti):\n${contesto}\n` : ''}
-COMPITO
-1. Riguarda tu la foto, soprattutto dove le due letture divergono (categoria, natura, scritte, autore/marca, epoca, materiali, stato).
-2. Produci UNA sola lettura, la più corretta e prudente.
-
-REGOLE DI RICONCILIAZIONE
-- Scritte, firme, punzoni: in "scritte_marchi_firme" metti SOLO ciò che leggi tu stesso nell'immagine. Se un analista riporta qualcosa che non riesci a confermare, NON includerlo: scrivilo in "da_verificare" come "scritta non confermata: …".
-- Dove i due concordano in modo indipendente la confidenza può restare o salire; dove discordano deve scendere.
-- Discrepanza che non riesci a risolvere guardando la foto: scegli la lettura più PRUDENTE (replica/riproduzione piuttosto che originale; nessuna attribuzione piuttosto che un'attribuzione) e segna risolta=false.
-- Non aggiungere dettagli che nessuno dei due ha visto e che tu non vedi. I dati del titolare restano vincolanti.
-
-Rispondi SOLO con un JSON valido: gli stessi campi della lettura (macro_categoria, cosa_vedo, scritte_marchi_firme, materiali_e_tecnica, indizi_epoca, stato, ipotesi, natura, da_verificare) più:
-"accordo": {
-  "livello": "alto | medio | basso",
-  "punti_concordi": ["ciò su cui le due letture concordano davvero"],
-  "discrepanze": [ { "campo": "...", "gemini": "cosa dice A", "groq": "cosa dice B", "verdetto": "cosa vedi tu e cosa hai scelto", "risolta": true } ]
-}`
-}
-
-const SYSTEM_VERIFICA = `Sei il REVISORE della perizia di Emporio 46, negozio di Firenze di arredi vintage e bijoux. Hai trent'anni di esperienza in antiquariato, modernariato, design, arte, gioielleria e numismatica. Non hai scritto la perizia: la controlli con occhio critico guardando la foto.
+// ─── Prompt di revisione ─────────────────────────────────────────────────────
+const SYSTEM_VERIFICA = `Sei il REVISORE della perizia di Emporio 46, negozio di Firenze di arredi vintage e bijoux. Hai trent'anni di esperienza in antiquariato, modernariato, design, arte, gioielleria e numismatica. La perizia da controllare è una bozza: la rivedi con occhio critico, come se non l'avessi scritta tu, guardando di nuovo la foto.
 
 ${PRONTUARIO}
 
@@ -330,7 +238,7 @@ ${REGOLE_ONESTA}
 ${REGOLE_TITOLARE}`
 
 function promptVerifica(obs: string, perizia: string, contesto: string, rilievi: string[]) {
-  return `OSSERVAZIONI RICONCILIATE SULLA FOTO:
+  return `OSSERVAZIONI SULLA FOTO:
 ${obs}
 ${contesto ? `\nINFORMAZIONI DEL TITOLARE (vincolanti):\n${contesto}\n` : ''}
 PERIZIA DA CONTROLLARE:
@@ -351,125 +259,63 @@ Rispondi SOLO con un JSON valido:
   "testo_corretto": "se da_correggere: l'INTERA perizia riscritta nello stesso formato, cambiando solo ciò che serve; altrimenti null" }`
 }
 
-// ─── Osservazione + riconciliazione (condivisa da perizia e scheda catalogo) ──
-interface Osservazione { obsJson: any; meta: PeriziaMeta; alive: Engine[] }
 
-async function osservaRiconcilia(image: string, contesto: string, engines: Engine[], step: (s: string) => void): Promise<Osservazione> {
+// ─── Osservazione ────────────────────────────────────────────────────────────
+interface Osservazione { obsJson: any; meta: PeriziaMeta }
+
+async function osserva(image: string, contesto: string, engine: Engine, step: (s: string) => void): Promise<Osservazione> {
   const prompt = PROMPT_OSSERVA + (contesto ? `\n\nINFORMAZIONI DEL TITOLARE (vincolanti, vedi regole): ${contesto}` : '')
-  step(engines.length > 1 ? 'Gemini e Groq osservano la foto in parallelo…' : `${engines[0]?.name} osserva la foto…`)
-  const settled = await Promise.allSettled(engines.map(e => e.visionJson(image, SYSTEM_OSSERVA, prompt, 1800)))
-  const ok: { e: Engine; obs: any }[] = []
-  const avvisi: string[] = []
-  settled.forEach((r, i) => {
-    if (r.status === 'fulfilled' && r.value && typeof r.value === 'object') ok.push({ e: engines[i], obs: r.value })
-    else avvisi.push(`${engines[i].name} non ha potuto analizzare la foto: ${errMsg(r.status === 'rejected' ? r.reason : 'risposta non valida')}`)
-  })
-  if (!ok.length) throw new Error(`Nessuna IA ha risposto. ${avvisi.join(' · ')}`)
-
-  const alive = ok.map(x => x.e)
-  const meta: PeriziaMeta = { modo: alive.length > 1 ? 'duo' : alive[0].name === 'Gemini' ? 'solo-gemini' : 'solo-groq', discrepanze: [], verifica: 'non-eseguita', problemi: [], avvisi }
-  if (ok.length === 1) {
-    if (engines.length > 1) avvisi.push(`Analisi eseguita con la sola ${ok[0].e.name}: l'accordo tra due IA non è verificabile.`)
-    return { obsJson: ok[0].obs, meta, alive }
-  }
-
-  const gem = ok.find(x => x.e.name === 'Gemini')!, gro = ok.find(x => x.e.name === 'Groq')!
-  const cmp = confronta(gem.obs, gro.obs)
-  step(cmp.livello === 'alto' ? 'Le due letture concordano: Gemini le riconcilia…' : 'Le letture divergono: Gemini fa da arbitro e riguarda la foto…')
-  let merged: any = null
-  for (const arbitro of [gem.e, gro.e]) {
-    try {
-      const r = await arbitro.visionJson(image, SYSTEM_ARBITRO, promptArbitro(gem.obs, gro.obs, cmp, contesto), 2800)
-      if (r && typeof r === 'object' && r.macro_categoria) { merged = r; if (arbitro !== gem.e) avvisi.push('Arbitro: Gemini non ha risposto, ha arbitrato Groq.'); break }
-    } catch (e) { avvisi.push(`Riconciliazione con ${arbitro.name} non riuscita: ${errMsg(e)}`) }
-  }
-  if (!merged) {
-    // nessun arbitro: si tiene la lettura di Gemini e le differenze diventano "da verificare"
-    avvisi.push('Riconciliazione non riuscita: uso la lettura di Gemini e segnalo le differenze come da verificare.')
-    merged = { ...gem.obs, da_verificare: [...(Array.isArray(gem.obs.da_verificare) ? gem.obs.da_verificare : []), ...cmp.diffs.map(d => `Le due IA divergono su ${d.campo} (Gemini: ${d.gemini}; Groq: ${d.groq})`)] }
-    meta.accordo = cmp.livello
-    meta.discrepanze = cmp.diffs.map(d => ({ ...d, verdetto: 'non arbitrata', risolta: false }))
-    return { obsJson: merged, meta, alive }
-  }
-
-  const arb = merged.accordo && typeof merged.accordo === 'object' ? merged.accordo : {}
-  delete merged.accordo
-  meta.accordo = minAccordo(cmp.livello, asAccordo(arb.livello) ?? cmp.livello)
-  const dis: Discrepanza[] = (Array.isArray(arb.discrepanze) ? arb.discrepanze : []).slice(0, 8).map((d: any) => ({
-    campo: clip(d?.campo, 60), gemini: clip(d?.gemini), groq: clip(d?.groq), verdetto: clip(d?.verdetto, 300), risolta: d?.risolta === true,
-  })).filter((d: Discrepanza) => d.campo)
-  // differenze viste dal confronto automatico che l'arbitro non ha menzionato: restano visibili e non risolte
-  for (const d of cmp.diffs) {
-    const nd = N(d.campo).split(' ')[0]
-    if (!dis.some(x => N(x.campo).includes(nd) || nd.includes(N(x.campo).split(' ')[0] || '#'))) dis.push({ ...d, verdetto: 'non valutata dall\'arbitro: da verificare', risolta: false })
-  }
-  meta.discrepanze = dis
-  return { obsJson: merged, meta, alive }
+  step('Gemini osserva la foto…')
+  let obsJson: any
+  try { obsJson = await engine.visionJson(image, SYSTEM_OSSERVA, prompt, 1800) }
+  catch (e) { throw new Error(`Gemini non ha potuto analizzare la foto: ${errMsg(e)}`) }
+  if (!obsJson || typeof obsJson !== 'object') throw new Error('Gemini non ha restituito una lettura valida della foto. Riprova.')
+  return { obsJson, meta: { verifica: 'non-eseguita', problemi: [], avvisi: [] } }
 }
 
-// ─── Scelta dei ruoli ────────────────────────────────────────────────────────
-function ruoli(alive: Engine[]): { writer: Engine; verifier: Engine; other?: Engine } {
-  const writer = alive.find(e => e.name === 'Groq') ?? alive[0]
-  const other = alive.find(e => e !== writer)
-  return { writer, verifier: other ?? writer, other }
-}
-
-async function riscrivi(writer: Engine, testo: string, rilievi: string[], obs: string, contesto: string): Promise<string> {
-  const out = await writer.text(SYSTEM_VALUTA,
+async function riscrivi(engine: Engine, testo: string, rilievi: string[], obs: string, contesto: string): Promise<string> {
+  const out = await engine.text(SYSTEM_VALUTA,
     `OSSERVAZIONI SULLA FOTO:\n${obs}\n${contesto ? `\nINFORMAZIONI DEL TITOLARE (vincolanti):\n${contesto}\n` : ''}\nPERIZIA DA CORREGGERE:\n${testo}\n\nRILIEVI DA SISTEMARE:\n- ${rilievi.join('\n- ')}\n\nRiscrivi l'INTERA perizia nello stesso formato correggendo solo ciò che serve a risolvere i rilievi. Rispondi solo con la perizia.`, 1900)
   return out.trim()
 }
 
 function bloccoVerifica(meta: PeriziaMeta): string {
   const righe: string[] = []
-  const chi = meta.modo === 'duo' ? 'Gemini + Groq' : meta.modo === 'solo-gemini' ? 'Gemini' : 'Groq'
-  let testa = `Analisi con ${chi}`
-  if (meta.accordo) testa += ` · accordo tra le due IA: ${meta.accordo.toUpperCase()}`
-  if (meta.verifica === 'ok') testa += ` · revisione di ${meta.verificatore}: nessun errore`
-  else if (meta.verifica === 'corretta') testa += ` · revisione di ${meta.verificatore}: perizia corretta`
+  let testa = 'Analisi con Gemini'
+  if (meta.verifica === 'ok') testa += ' · revisione finale: nessun errore'
+  else if (meta.verifica === 'corretta') testa += ' · revisione finale: perizia corretta'
   else testa += ' · revisione finale non eseguita'
-  righe.push(`**Verifica incrociata** — ${testa}.`)
-  for (const d of meta.discrepanze.slice(0, 5)) righe.push(`- ${d.campo}: Gemini «${clip(d.gemini, 90)}» / Groq «${clip(d.groq, 90)}» → ${clip(d.verdetto, 160)}${d.risolta ? '' : ' (da verificare)'}`)
+  righe.push(`**Revisione finale** — ${testa}.`)
   for (const p of meta.problemi.slice(0, 4)) righe.push(`- Corretto in revisione: ${clip(p, 180)}`)
   for (const a of meta.avvisi.slice(0, 4)) righe.push(`- Nota: ${clip(a, 200)}`)
   return righe.join('\n')
 }
 
-// ─── Passo 1+2+3+4: dalla foto alla perizia ──────────────────────────────────
+// ─── Dalla foto alla perizia ─────────────────────────────────────────────────
 export async function periziaAnalyze(image: string, contesto = '', opts: RunOpts = {}): Promise<PeriziaResult> {
   const step = opts.onStep ?? (() => {})
-  const engines = opts.engines ?? defaultEngines()
-  const { obsJson, meta, alive } = await osservaRiconcilia(image, contesto, engines, step)
+  const engine = opts.engine ?? geminiEngine
+  const { obsJson, meta } = await osserva(image, contesto, engine, step)
   const obs = fmtObs(obsJson)
-  const { writer, verifier } = ruoli(alive)
 
   // Perizia
-  step(`${writer.name} scrive la perizia…`)
-  const promptValuta = `OSSERVAZIONI SULLA FOTO (${meta.modo === 'duo' ? 'lettura unica riconciliata da due analisti indipendenti' : 'estratte da un analista che ha visto l\'immagine'}):\n${obs}\n${contesto ? `\nINFORMAZIONI DEL TITOLARE (vincolanti, hanno la precedenza sulla foto):\n${contesto}\n` : ''}\nScrivi ora la perizia completa nel formato richiesto. Se le ipotesi hanno confidenza bassa, se le due IA divergono o se l'oggetto è in classe D, applica il metodo di stima con prudenza.`
-  let text = ''
-  let writerUsato = writer
-  try { text = (await writer.text(SYSTEM_VALUTA, promptValuta, 1900)).trim() }
-  catch (e) {
-    const altro = alive.find(x => x !== writer)
-    if (!altro) throw e
-    meta.avvisi.push(`${writer.name} non ha potuto scrivere la perizia (${errMsg(e)}): l'ha scritta ${altro.name}.`)
-    text = (await altro.text(SYSTEM_VALUTA, promptValuta, 1900)).trim(); writerUsato = altro
-  }
+  step('Gemini scrive la perizia…')
+  const promptValuta = `OSSERVAZIONI SULLA FOTO (estratte da un analista che ha visto l'immagine):\n${obs}\n${contesto ? `\nINFORMAZIONI DEL TITOLARE (vincolanti, hanno la precedenza sulla foto):\n${contesto}\n` : ''}\nScrivi ora la perizia completa nel formato richiesto. Se le ipotesi hanno confidenza bassa o se l'oggetto è in classe D, applica il metodo di stima con prudenza.`
+  let text = (await engine.text(SYSTEM_VALUTA, promptValuta, 1900)).trim()
 
-  // Revisione: l'altra IA (o la stessa, se è l'unica) controlla guardando la foto
-  const revisore = writerUsato === writer ? verifier : (alive.find(x => x !== writerUsato) ?? writerUsato)
+  // Revisione: Gemini ricontrolla guardando di nuovo la foto
   let rilievi = controllaPerizia(text)
-  step(`${revisore.name} ricontrolla la perizia sulla foto…`)
+  step('Gemini ricontrolla la perizia sulla foto…')
   try {
-    const v = await revisore.visionJson(image, SYSTEM_VERIFICA, promptVerifica(obs, text, contesto, rilievi), 3400)
-    meta.verificatore = revisore === writerUsato ? `${revisore.name} (autoverifica)` : revisore.name
+    const v = await engine.visionJson(image, SYSTEM_VERIFICA, promptVerifica(obs, text, contesto, rilievi), 3400)
+    meta.verificatore = 'Gemini'
     meta.verifica = 'ok'
     const problemi: string[] = (Array.isArray(v?.problemi) ? v.problemi : []).map((p: any) => clip(typeof p === 'string' ? p : p?.descrizione, 220)).filter(Boolean)
     const cand = typeof v?.testo_corretto === 'string' ? v.testo_corretto.trim() : ''
     if (v?.verdetto === 'da_correggere' && cand.length > 400) {
       const dopo = controllaPerizia(cand)
       if (dopo.length <= rilievi.length) { text = cand; meta.verifica = 'corretta'; meta.problemi = problemi; rilievi = dopo }
-      else meta.avvisi.push('La correzione proposta dal revisore è stata scartata perché peggiorava il formato o la stima.')
+      else meta.avvisi.push('La correzione proposta dalla revisione è stata scartata perché peggiorava il formato o la stima.')
     }
   } catch (e) {
     meta.avvisi.push(`Revisione finale non riuscita: ${errMsg(e)}`)
@@ -479,7 +325,7 @@ export async function periziaAnalyze(image: string, contesto = '', opts: RunOpts
   if (rilievi.length) {
     step('Sistemo gli ultimi rilievi automatici…')
     try {
-      const nuova = await riscrivi(writerUsato, text, rilievi, obs, contesto)
+      const nuova = await riscrivi(engine, text, rilievi, obs, contesto)
       const dopo = controllaPerizia(nuova)
       if (nuova.length > 400 && dopo.length < rilievi.length) { text = nuova; rilievi = dopo }
     } catch { /* si tiene il testo attuale */ }
@@ -488,6 +334,7 @@ export async function periziaAnalyze(image: string, contesto = '', opts: RunOpts
 
   return { text: `${text}\n\n${bloccoVerifica(meta)}`.trim(), obs, meta }
 }
+
 
 // Elenco unico (senza doppioni) di ciò che il titolare ha detto
 export function datiTitolare(...liste: (string[] | undefined)[]): string[] {
@@ -503,25 +350,21 @@ export const isSoloDomanda = (t: string) => /\?\s*$/.test(t.trim()) && t.trim().
 
 const RICHIESTA_DETTAGLIO = /\b(guarda|guardi|riguarda|vedi|controlla|nella foto|in foto|in basso|in alto|a destra|a sinistra|angolo|firma|firmat|scritta|leggi|leggibil|timbro|punzone|etichetta|marchio|retro|dettaglio|ingrandisc)/i
 
+
 // Domande e correzioni dell'admin: ogni dato fornito entra come punto di partenza e la valutazione viene rifatta da zero su quello.
-// Se l'admin chiede di guardare un dettaglio, la foto viene riletta da ENTRAMBE le IA e le due letture vengono messe a confronto.
+// Se l'admin chiede di guardare un dettaglio, Gemini rilegge la foto su quel punto.
 export async function periziaFollowUp(o: { obs: string; chat: { role: string; text: string }[]; facts?: string[]; domanda: string; image?: string }, opts: RunOpts = {}): Promise<{ text: string; obs: string }> {
-  const engines = opts.engines ?? defaultEngines()
+  const engine = opts.engine ?? geminiEngine
   const step = opts.onStep ?? (() => {})
   const adminMsgs = datiTitolare(o.facts, o.chat.filter(m => m.role === 'user').map(m => m.text), [o.domanda])
   let obs = o.obs
-  let alive = engines
   if (o.image && RICHIESTA_DETTAGLIO.test(o.domanda)) {
-    step('Rileggo il dettaglio sulla foto con entrambe le IA…')
+    step('Gemini rilegge il dettaglio sulla foto…')
     const q = `Il titolare scrive: "${o.domanda}"\nRiguarda la foto con attenzione a quel punto. Descrivi SOLO ciò che si vede davvero e trascrivi letteralmente le scritte/firme/punzoni leggibili; se non si vede o non è leggibile, dillo. Massimo 8 righe.`
-    const res = await Promise.allSettled(engines.map(e => e.visionText(o.image!, SYSTEM_OSSERVA, q, 700)))
-    const righe: string[] = []
-    const vivi: Engine[] = []
-    res.forEach((r, i) => { if (r.status === 'fulfilled' && r.value.trim()) { righe.push(`[${engines[i].name}] ${r.value.trim()}`); vivi.push(engines[i]) } })
-    if (righe.length) {
-      obs += `\n\nOSSERVAZIONE AGGIUNTIVA (nuova lettura della foto su richiesta del titolare${righe.length > 1 ? '; due letture indipendenti: dove divergono, vale solo ciò che è confermato da entrambe' : ''}):\n${righe.join('\n')}`
-      alive = vivi
-    }
+    try {
+      const r = (await engine.visionText(o.image, SYSTEM_OSSERVA, q, 700)).trim()
+      if (r) obs += `\n\nOSSERVAZIONE AGGIUNTIVA (nuova lettura della foto su richiesta del titolare):\n${r}`
+    } catch { /* si prosegue con le osservazioni già note */ }
   }
   const ultimaAI = [...o.chat].reverse().find(m => m.role === 'ai' && m.text && !m.text.startsWith('⚠'))?.text || ''
   const prompt = `OSSERVAZIONI SULLA FOTO:\n${obs}
@@ -532,27 +375,20 @@ ${adminMsgs.map((t, i) => `${i + 1}. ${t}`).join('\n')}
 ULTIMO MESSAGGIO DEL TITOLARE (a cui rispondi ora): ${o.domanda}
 
 TUA PERIZIA PRECEDENTE (può contenere errori, non è vincolante; se contrasta con le informazioni del titolare, scartala):
-${ultimaAI.replace(/\n\n\*\*Verifica incrociata\*\*[\s\S]*$/, '').slice(0, 2500) || '(nessuna)'}
+${ultimaAI.replace(/\n\n\*\*(?:Verifica incrociata|Revisione finale)\*\*[\s\S]*$/, '').slice(0, 2500) || '(nessuna)'}
 
 Rispondi in questo formato (italiano, concisa):
 **Ho registrato** — cosa hai capito dall'ultimo messaggio, in 1-3 punti (se cita un autore o un marchio, scrivi nome e cognome completi come li hai intesi e perché sono coerenti con l'oggetto).
 **Cosa cambia** — effetto su identificazione, natura/autenticità, epoca, classe di valore. Se è una domanda semplice, rispondi direttamente qui.
 **Stima aggiornata** — riga completa ("Prezzo di vendita consigliato", "Valore di realizzo", "Fiducia"; per la classe D: scenario più probabile e "se confermato come autentico: cosa serve per verificarlo").
 **Per verificare** — 1-3 controlli o foto utili (solo se servono).`
-  const { writer } = ruoli(alive.length ? alive : engines)
-  step(`${writer.name} aggiorna la perizia…`)
-  let text = ''
-  try { text = (await writer.text(SYSTEM_VALUTA, prompt, 1600)).trim() }
-  catch (e) {
-    const altro = (alive.length ? alive : engines).find(x => x !== writer)
-    if (!altro) throw e
-    text = (await altro.text(SYSTEM_VALUTA, prompt, 1600)).trim()
-  }
+  step('Gemini aggiorna la perizia…')
+  let text = (await engine.text(SYSTEM_VALUTA, prompt, 1600)).trim()
   const rilievi = controllaStima(text)
   if (rilievi.length) {
     step('Controllo della stima…')
     try {
-      const nuova = (await writer.text(SYSTEM_VALUTA, `${prompt}\n\nRISPOSTA DA CORREGGERE:\n${text}\n\nRILIEVI DA SISTEMARE:\n- ${rilievi.join('\n- ')}\n\nRiscrivi la risposta nello stesso formato sistemando solo i rilievi. Rispondi solo con la risposta.`, 1600)).trim()
+      const nuova = (await engine.text(SYSTEM_VALUTA, `${prompt}\n\nRISPOSTA DA CORREGGERE:\n${text}\n\nRILIEVI DA SISTEMARE:\n- ${rilievi.join('\n- ')}\n\nRiscrivi la risposta nello stesso formato sistemando solo i rilievi. Rispondi solo con la risposta.`, 1600)).trim()
       if (nuova && controllaStima(nuova).length < rilievi.length) text = nuova
     } catch { /* si tiene la risposta attuale */ }
   }
@@ -560,37 +396,27 @@ Rispondi in questo formato (italiano, concisa):
 }
 
 // Prezzo per un articolo del catalogo, con lo stesso metodo (usato dal pulsante "Suggerisci prezzo").
-// Le due IA stimano in modo indipendente: se le fasce si sovrappongono vale la sovrapposizione; se sono lontane vale la più prudente.
 export async function periziaPrezzo(nome: string, era: string, categoria: string, descrizione = '', opts: RunOpts = {}): Promise<string> {
-  const engines = opts.engines ?? defaultEngines()
+  const engine = opts.engine ?? geminiEngine
   const sys = `Sei un perito italiano di antiquariato, modernariato, design, arte, gioielleria e numismatica per un negozio di Firenze.\n\n${PRONTUARIO}\n\n${METODO_STIMA}`
   const q = `Articolo: "${nome}"\nEpoca: ${era || 'non indicata'}\nCategoria: ${categoria || 'non indicata'}\n${descrizione ? `Descrizione: ${descrizione}\n` : ''}\nApplica il metodo di stima. Rispondi SOLO con il prezzo di vendita consigliato nel formato "€ 120 – € 200" (intervallo non più largo di 2×), oppure "Su richiesta" se l'articolo è di classe D o non è stimabile con ragionevole affidabilità. Nessun altro testo.`
-  const res = await Promise.allSettled(engines.map(e => e.text(sys, q, 400, 'low')))
-  const risposte = res.flatMap(r => r.status === 'fulfilled' ? [r.value.replace(/^['"`\s]+|['"`\s]+$/g, '').split('\n')[0].trim()] : [])
-  if (!risposte.length) { const f = res.find(r => r.status === 'rejected') as PromiseRejectedResult | undefined; throw f?.reason ?? new Error('Nessuna IA ha risposto.') }
-  if (risposte.some(r => /su richiesta/i.test(r))) return 'Su richiesta'
-  const ranges = risposte.map(r => parseRange(r)).filter((r): r is [number, number] => !!r)
-  if (!ranges.length) return risposte[0]
-  let out: [number, number]
-  if (ranges.length === 1) out = ranges[0]
-  else {
-    const lo = Math.max(ranges[0][0], ranges[1][0]), hi = Math.min(ranges[0][1], ranges[1][1])
-    out = lo <= hi ? [lo, hi] : (ranges[0][0] + ranges[0][1] <= ranges[1][0] + ranges[1][1] ? ranges[0] : ranges[1])
-  }
-  const [a, b] = restringiRange(out[0], out[1], 2)
-  return fmtRange([a, b])
+  const risposta = (await engine.text(sys, q, 400, 'low')).replace(/^['"`\s]+|['"`\s]+$/g, '').split('\n')[0].trim()
+  if (/su richiesta/i.test(risposta)) return 'Su richiesta'
+  const r = parseRange(risposta)
+  if (!r) return risposta
+  return fmtRange(restringiRange(r[0], r[1], 2))
 }
 
 // ─── Scheda catalogo da foto (pulsante "Analizza con AI" del modulo oggetto) ──
+
 const SYSTEM_SCHEDA = `Sei un perito italiano e scrivi le schede di catalogo di Emporio 46 (Firenze: arredi vintage e bijoux).\n\n${PRONTUARIO}\n\n${METODO_STIMA}\n\n${REGOLE_ONESTA}\n\n${REGOLE_TITOLARE}`
 export interface SchedaResult { scheda: any; meta: PeriziaMeta }
 export async function schedaDaFoto(image: string, contesto = '', opts: RunOpts = {}): Promise<SchedaResult> {
   const step = opts.onStep ?? (() => {})
-  const engines = opts.engines ?? defaultEngines()
-  const { obsJson, meta, alive } = await osservaRiconcilia(image, contesto, engines, step)
-  const { writer } = ruoli(alive)
-  step(`${writer.name} compila la scheda…`)
-  const prompt = `OSSERVAZIONI SULLA FOTO (${meta.modo === 'duo' ? 'lettura riconciliata da due analisti indipendenti' : 'analista singolo'}):\n${fmtObs(obsJson)}\n${contesto ? `\nINFORMAZIONI DEL TITOLARE (vincolanti):\n${contesto}\n` : ''}
+  const engine = opts.engine ?? geminiEngine
+  const { obsJson, meta } = await osserva(image, contesto, engine, step)
+  step('Gemini compila la scheda…')
+  const prompt = `OSSERVAZIONI SULLA FOTO (analista che ha visto l'immagine):\n${fmtObs(obsJson)}\n${contesto ? `\nINFORMAZIONI DEL TITOLARE (vincolanti):\n${contesto}\n` : ''}
 Non inventare marchi, firme o autori: se non sono leggibili o sicuri, descrivi lo stile ("nello stile di"). Rispondi SOLO con un JSON valido (niente altro testo) con questi campi:
 {
   "nome": "nome preciso e commerciale dell'oggetto in italiano (es. 'Orologio da tavolo Art Déco in ottone dorato')",
@@ -600,14 +426,7 @@ Non inventare marchi, firme o autori: se non sono leggibili o sicuri, descrivi l
   "badge": "etichetta breve (es. 'Disponibile', 'Pezzo raro', 'In vetrina', 'Ottimo stato')",
   "prezzo_suggerito": "fascia ricavata col metodo di stima, formato '€ 120 – € 200' (mai più larga di 2×); 'Su richiesta' se l'oggetto è di classe D o non è stimabile da foto"
 }`
-  let raw = ''
-  try { raw = await writer.text(SYSTEM_SCHEDA, prompt, 1200) }
-  catch (e) {
-    const altro = alive.find(x => x !== writer)
-    if (!altro) throw e
-    meta.avvisi.push(`${writer.name} non ha compilato la scheda (${errMsg(e)}): l'ha compilata ${altro.name}.`)
-    raw = await altro.text(SYSTEM_SCHEDA, prompt, 1200)
-  }
+  const raw = await engine.text(SYSTEM_SCHEDA, prompt, 1200)
   const scheda = extractJson<any>(raw)
   // La stima si fa rispettare in codice: mai più larga di 2×
   if (typeof scheda?.prezzo_suggerito === 'string' && !/su richiesta/i.test(scheda.prezzo_suggerito)) {

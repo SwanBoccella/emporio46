@@ -1,6 +1,6 @@
-// ─── Client Gemini (Google) — secondo "perito" della doppia IA ───────────────
-// Gemini lavora in coppia con Groq (vedi perizia.ts): entrambi guardano la foto in modo indipendente,
-// poi Gemini riconcilia le due letture e verifica la perizia finale.
+// ─── Client Gemini (Google) — unica IA della perizia e dei testi del catalogo ─────────────
+// Usato da: Perizia AI (perizia.ts), scheda e descrizioni degli articoli del catalogo (AdminPanel).
+// Groq (groq.ts) resta solo per gli altri testi del pannello (SEO, traduzioni, recensioni, promozioni…).
 // I nomi dei modelli cambiano spesso: la lista è una sequenza di ripiego (si passa al successivo se uno è
 // dismesso, senza quota o sovraccarico) e si può sovrascrivere dal pannello admin senza rifare il deploy.
 // Verificati a ottobre 2026: gemini-3.8-flash (stabile), gemini-3.6-flash, gemini-3.1-pro-preview, gemini-3-flash-preview.
@@ -223,6 +223,14 @@ async function imagePart(image: string) {
 // ─── API ─────────────────────────────────────────────────────────────────────
 export function geminiText(prompt: string, maxTokens = 700): Promise<string> {
   return generate({ parts: [{ text: prompt }], maxTokens, think: 'low' })
+}
+// Descrizione/testo da una foto (catalogo): una sola chiamata, ragionamento leggero
+export async function geminiVision(image: string, prompt: string, maxTokens = 700): Promise<string> {
+  return geminiExpertVisionText(image, 'Sei un esperto di un negozio italiano di arredi vintage e bijoux. Rispondi in italiano.', prompt, maxTokens, 'low')
+}
+// Risposta JSON da un testo (catalogo)
+export function geminiJson<T = any>(prompt: string, maxTokens = 1200): Promise<T> {
+  return geminiExpertTextJson<T>('Sei un esperto di un negozio italiano di arredi vintage e bijoux. Rispondi solo con JSON valido, senza markdown.', prompt, maxTokens, 'low')
 }
 export function geminiExpertText(system: string, prompt: string, maxTokens = 1600, think: GeminiThink = 'medium'): Promise<string> {
   return generate({ system, parts: [{ text: prompt }], maxTokens, think, timeoutMs: 100000 })
